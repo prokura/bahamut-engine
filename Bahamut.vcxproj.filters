@@ -49,12 +49,6 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Core\Entity.h">
-      <Filter>Source Files\Entity</Filter>
-    </ClInclude>
-    <ClInclude Include="Core\Core_Config.h">
-      <Filter>Source Files\Entity</Filter>
-    </ClInclude>
     <ClInclude Include="Source\Rendering\Renderer.h">
       <Filter>Source Files\Renderer</Filter>
     </ClInclude>
@@ -69,6 +63,12 @@
     </ClInclude>
     <ClInclude Include="Source\Rendering\WindowHandler.h">
       <Filter>Source Files\Renderer\WindowHandler</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Core\Entity.h">
+      <Filter>Source Files\Entity</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Core\Core_Config.h">
+      <Filter>Source Files\Entity</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

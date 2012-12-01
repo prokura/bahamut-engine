@@ -20,8 +20,8 @@
     <ClCompile Include="Source\Rendering\WindowHandler.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Core\Core_Config.h" />
-    <ClInclude Include="Core\Entity.h" />
+    <ClInclude Include="Source\Core\Core_Config.h" />
+    <ClInclude Include="Source\Core\Entity.h" />
     <ClInclude Include="Source\Core\float2.h" />
     <ClInclude Include="Source\Core\float3.h" />
     <ClInclude Include="Source\Core\float4.h" />
