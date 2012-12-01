@@ -2,7 +2,6 @@
 #include "WindowHandler.h"
 #include <assert.h>
 
-
 ///*** Globals ***
 
 const bool FULL_SCREEN = false;

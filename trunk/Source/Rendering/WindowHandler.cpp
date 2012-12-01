@@ -82,3 +82,17 @@ void Window_Destroy()
 
 	return;
 }
+
+bool Window_GetMessage()
+{
+	MSG msg = {0};
+
+	if( GetMessage( &msg, NULL, 0, 0 ) )
+	{
+		TranslateMessage( &msg );
+		DispatchMessage( &msg );
+		return true;
+	}
+
+	return false;
+}
