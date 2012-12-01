@@ -14,12 +14,7 @@ static unsigned entity_next = 0;
 static Entity entity_freelist[ MAX_ENTITIES ];
 static unsigned entity_freelist_count = 0;
 
-/*static Component_Destroy_Callback destroy_functions[ MAX_ENTITIES ][ MAX_COMPONENTS_PER_ENTITY ];
-static unsigned destroy_function_count = 0;
-
-/*void entity_register_component_destroy_function( Component_Destroy_Callback func )
-{
-}*/
+//USE 2bits of the u32 to implement a ref counter
 
 //*** Create ***
 
