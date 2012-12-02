@@ -1,5 +1,46 @@
 #include "WindowHandler.h"
 
+//*** Windows Api Values ***
+
+HINSTANCE hinstance;
+HWND hwnd;
+WNDCLASSEX wc;
+std::string window_title;
+
+//*** Window Message CallBack ***
+
+static LRESULT CALLBACK WndProc(HWND hwnd, UINT umessage, WPARAM wparam, LPARAM lparam)
+{
+	PAINTSTRUCT ps;
+    HDC hdc;
+
+	switch(umessage)
+	{
+		// Check if the window is being destroyed.
+		case WM_DESTROY:
+			PostQuitMessage(0);
+		break;
+
+		// Check if the window is being closed.
+		case WM_CLOSE:
+			PostQuitMessage(0);		
+		break;
+
+		case WM_PAINT:
+			hdc = BeginPaint( hwnd, &ps );
+            EndPaint( hwnd, &ps );
+		break;
+
+		default:
+			return DefWindowProc(hwnd, umessage, wparam, lparam);
+		break;
+	}
+
+	return 0;
+}
+
+//*** Window Init ***
+
 void Window_Init( int width, int height, const char* title, bool fullscreen )
 {
 	window_title = std::string( title );
@@ -67,6 +108,8 @@ void Window_Init( int width, int height, const char* title, bool fullscreen )
 	//ShowCursor(false);
 }
 
+//*** Window Destroy ***
+
 void Window_Destroy()
 {
 	// Show the mouse cursor.
@@ -83,6 +126,8 @@ void Window_Destroy()
 	return;
 }
 
+//*** Window GetMessage ***
+
 bool Window_GetMessage()
 {
 	MSG msg = {0};
@@ -95,4 +140,11 @@ bool Window_GetMessage()
 	}
 
 	return false;
+}
+
+//*** Window GetHWND ***
+
+HWND Window_GetHWND()
+{
+	return hwnd;
 }

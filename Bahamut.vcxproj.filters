@@ -21,54 +21,69 @@
     <Filter Include="Source Files\Renderer">
       <UniqueIdentifier>{4f281010-de23-4d8c-b01b-89ec8e173fcb}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Source Files\Renderer\WindowHandler">
+    <Filter Include="Source Files\WindowHandler">
       <UniqueIdentifier>{58ff12f6-9637-427d-a976-85b7fcb049ab}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Renderer\DirectX">
+      <UniqueIdentifier>{448a68fa-d1cf-45ca-8542-873be1872a68}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\WindowHandler\Windows">
+      <UniqueIdentifier>{02d82038-0714-4d10-baa2-4193de802ff6}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="main.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Core\float2.cpp">
+    <ClCompile Include="Source\float2.cpp">
       <Filter>Source Files\Math</Filter>
     </ClCompile>
-    <ClCompile Include="Source\Core\float3.cpp">
+    <ClCompile Include="Source\float3.cpp">
       <Filter>Source Files\Math</Filter>
     </ClCompile>
-    <ClCompile Include="Source\Core\float4.cpp">
+    <ClCompile Include="Source\float4.cpp">
       <Filter>Source Files\Math</Filter>
     </ClCompile>
-    <ClCompile Include="Source\Core\Entity.cpp">
+    <ClCompile Include="Source\Entity.cpp">
       <Filter>Source Files\Entity</Filter>
     </ClCompile>
-    <ClCompile Include="Source\Rendering\DXRenderer.cpp">
-      <Filter>Source Files\Renderer</Filter>
+    <ClCompile Include="Source\DXRenderer.cpp">
+      <Filter>Source Files\Renderer\DirectX</Filter>
     </ClCompile>
-    <ClCompile Include="Source\Rendering\WindowHandler.cpp">
-      <Filter>Source Files\Renderer\WindowHandler</Filter>
+    <ClCompile Include="Source\WindowHandler.cpp">
+      <Filter>Source Files\WindowHandler\Windows</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\DXBitmap.cpp">
+      <Filter>Source Files\Renderer\DirectX</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\main.cpp">
+      <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Source\Rendering\Renderer.h">
+    <ClInclude Include="Source\float2.h">
+      <Filter>Source Files\Math</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\float3.h">
+      <Filter>Source Files\Math</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\float4.h">
+      <Filter>Source Files\Math</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Entity.h">
+      <Filter>Source Files\Entity</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Renderer.h">
       <Filter>Source Files\Renderer</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Core\float2.h">
-      <Filter>Source Files\Math</Filter>
+    <ClInclude Include="Source\WindowHandler.h">
+      <Filter>Source Files\WindowHandler</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Core\float3.h">
-      <Filter>Source Files\Math</Filter>
+    <ClInclude Include="source\config.h">
+      <Filter>Source Files</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Core\float4.h">
-      <Filter>Source Files\Math</Filter>
+    <ClInclude Include="Source\DXRenderer.h">
+      <Filter>Source Files\Renderer\DirectX</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Rendering\WindowHandler.h">
-      <Filter>Source Files\Renderer\WindowHandler</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Core\Entity.h">
-      <Filter>Source Files\Entity</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Core\Core_Config.h">
-      <Filter>Source Files\Entity</Filter>
+    <ClInclude Include="Source\Bitmap.h">
+      <Filter>Source Files\Renderer</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

@@ -14,5 +14,9 @@ const unsigned MAX_PLAYER_COMPONENTS = 4;
 //RENDERER
 const unsigned MAX_RENDERER_SUBMITS = 4096;
 const unsigned MAX_BITMAPS = 256;
+const unsigned REFRESH_RATE = 60;
+const bool VSYNC_ENABLED = true;
+const bool FULL_SCREEN = false;
+const bool MULTI_SAMPLING = true;
 
 #endif /* config_h */
