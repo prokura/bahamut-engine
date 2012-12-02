@@ -1,6 +1,6 @@
 //*** Entity.cpp ***
 
-#include "Core_Config.h"
+#include "config.h"
 #include <assert.h>
 
 typedef unsigned Entity;

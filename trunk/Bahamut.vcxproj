@@ -11,22 +11,25 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="main.cpp" />
-    <ClCompile Include="Source\Core\Entity.cpp" />
-    <ClCompile Include="Source\Core\float2.cpp" />
-    <ClCompile Include="Source\Core\float3.cpp" />
-    <ClCompile Include="Source\Core\float4.cpp" />
-    <ClCompile Include="Source\Rendering\DXRenderer.cpp" />
-    <ClCompile Include="Source\Rendering\WindowHandler.cpp" />
+    <ClCompile Include="Source\DXBitmap.cpp" />
+    <ClCompile Include="Source\DXRenderer.cpp" />
+    <ClCompile Include="Source\Entity.cpp" />
+    <ClCompile Include="Source\float2.cpp" />
+    <ClCompile Include="Source\float3.cpp" />
+    <ClCompile Include="Source\float4.cpp" />
+    <ClCompile Include="Source\main.cpp" />
+    <ClCompile Include="Source\WindowHandler.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Source\Core\Core_Config.h" />
-    <ClInclude Include="Source\Core\Entity.h" />
-    <ClInclude Include="Source\Core\float2.h" />
-    <ClInclude Include="Source\Core\float3.h" />
-    <ClInclude Include="Source\Core\float4.h" />
-    <ClInclude Include="Source\Rendering\WindowHandler.h" />
-    <ClInclude Include="Source\Rendering\Renderer.h" />
+    <ClInclude Include="Source\Bitmap.h" />
+    <ClInclude Include="source\config.h" />
+    <ClInclude Include="Source\DXRenderer.h" />
+    <ClInclude Include="Source\Entity.h" />
+    <ClInclude Include="Source\float2.h" />
+    <ClInclude Include="Source\float3.h" />
+    <ClInclude Include="Source\float4.h" />
+    <ClInclude Include="Source\Renderer.h" />
+    <ClInclude Include="Source\WindowHandler.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{A8E00147-15D5-4AB8-A925-C28C94FE13AA}</ProjectGuid>
@@ -55,7 +58,18 @@
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
-  <PropertyGroup />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <IncludePath>C:\Soft\DXSDK\Include;$(IncludePath)</IncludePath>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <LibraryPath>C:\Soft\DXSDK\Lib\x86;$(LibraryPath)</LibraryPath>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <IncludePath>C:\Soft\DXSDK\Include;$(IncludePath)</IncludePath>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <LibraryPath>C:\Soft\DXSDK\Lib\x86;$(LibraryPath)</LibraryPath>
+  </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
@@ -63,6 +77,7 @@
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>d3d10.lib;d3dx10.lib;dxgi.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -76,6 +91,7 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
+      <AdditionalDependencies>d3d10.lib;d3dx10.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
