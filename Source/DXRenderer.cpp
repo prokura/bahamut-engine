@@ -18,6 +18,16 @@ ID3D10DepthStencilState*	dx_depthStencil_off		= NULL;
 ID3D10DepthStencilView*		dx_depthStencil_view	= NULL;
 ID3D10RasterizerState*		dx_raster_state			= NULL;
 
+ID3D10Buffer*				dx_vertex_buffer		= NULL;
+ID3D10Buffer*				dx_index_buffer			= NULL;
+int							vertex_count			= NULL;
+
+struct Vertex_Type
+{
+	D3DXVECTOR3 position;
+	D3DXVECTOR2 texture;
+};
+
 D3DXMATRIX					dx_mat_projection;
 D3DXMATRIX					dx_mat_world;
 D3DXMATRIX					dx_mat_ortho;
@@ -31,9 +41,11 @@ float						screen_bottom			= 0;
 
 HRESULT Init_Device( int width, int height );
 void Init_View_Matrix();
+void Init_Vertex_Buffer();
 void Cleanup_Device();
 void Turn_ZBuffer_On();
 void Turn_ZBuffer_Off();
+void Update_Vertex_Buffer();
 
 //*** Initialise ***
 
@@ -47,6 +59,7 @@ bool Renderer_Init( unsigned width, unsigned height, const char* title )
         return false;
     }
 
+	Init_Vertex_Buffer();
 	Init_View_Matrix();
 
 	return true;
@@ -73,14 +86,23 @@ void Renderer_Draw()
 	Turn_ZBuffer_Off();
 
 	// Put the bitmap vertex and index buffers on the graphics pipeline to prepare them for drawing.
-	/*result = m_Bitmap->Render(m_D3D->GetDevice(), 100, 100);
-	if(!result)
-	{
-		return false;
-	}*/
+	Update_Vertex_Buffer();
 
-	// Render the bitmap using the texture shader.
-	//m_TextureShader->Render(m_D3D->GetDevice(), m_Bitmap->GetIndexCount(), worldMatrix, viewMatrix, orthoMatrix, m_Bitmap->GetTexture());
+	unsigned int stride;
+	unsigned int offset;
+
+	// Set vertex buffer stride and offset.
+    stride = sizeof(Vertex_Type); 
+	offset = 0;
+    
+	// Set the vertex buffer to active in the input assembler so it can be rendered.
+	dx_device->IASetVertexBuffers(0, 1, &dx_vertex_buffer, &stride, &offset);
+
+    // Set the index buffer to active in the input assembler so it can be rendered.
+    dx_device->IASetIndexBuffer(dx_index_buffer, DXGI_FORMAT_R32_UINT, 0);
+
+    // Set the type of primitive that should be rendered from this vertex buffer, in this case triangles.
+    dx_device->IASetPrimitiveTopology(D3D10_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
 	// Turn the Z buffer back on now that all 2D rendering has completed.
 	Turn_ZBuffer_On();
@@ -98,7 +120,6 @@ void Renderer_Draw()
 
 }
 
-
 //*** Get Device() ***
 
 ID3D10Device* Get_Device()
@@ -106,11 +127,86 @@ ID3D10Device* Get_Device()
 	return dx_device;
 }
 
-void Update_Bitmap_Geometry( unsigned bitmapId )
+//*** Update Vertex Buffer
+
+void Update_Vertex_Buffer()
 {
+	Bitmap bitmap = bitmaps[0];
+
+	float left		= (float)bitmap.x;
+	float right		= (float)bitmap.x + bitmap.width;
+	float top		= (float)bitmap.y;
+	float bottom	= (float)bitmap.y + bitmap.height;
+
+	vertex_count = 6;
+
+	// Create the vertex array.
+	Vertex_Type* vertices = new Vertex_Type[vertex_count];
+
+	// Load the vertex array with data.
+	vertices[0].position = D3DXVECTOR3(left, top, 0.0f);  // Top left.
+	vertices[0].texture = D3DXVECTOR2(0.0f, 0.0f);
+	vertices[1].position = D3DXVECTOR3(right, bottom, 0.0f);  // Bottom right.
+	vertices[1].texture = D3DXVECTOR2(1.0f, 1.0f);
+	vertices[2].position = D3DXVECTOR3(left, bottom, 0.0f);  // Bottom left.
+	vertices[2].texture = D3DXVECTOR2(0.0f, 1.0f);
+
+	vertices[3].position = D3DXVECTOR3(left, top, 0.0f);  // Top left.
+	vertices[3].texture = D3DXVECTOR2(0.0f, 0.0f);
+	vertices[4].position = D3DXVECTOR3(right, top, 0.0f);  // Top right.
+	vertices[4].texture = D3DXVECTOR2(1.0f, 0.0f);
+	vertices[5].position = D3DXVECTOR3(right, bottom, 0.0f);  // Bottom right.
+	vertices[5].texture = D3DXVECTOR2(1.0f, 1.0f);
+
+	// Initialize the vertex buffer pointer to null first.
+	void* verticesPtr = NULL;
+
+	// Lock the vertex buffer.
+	HRESULT lock_vBuffer = dx_vertex_buffer->Map(D3D10_MAP_WRITE_DISCARD, 0, (void**)&verticesPtr);
+	
+	assert( SUCCEEDED(lock_vBuffer) );
+
+	// Copy the data into the vertex buffer.
+	memcpy(verticesPtr, (void*)vertices, (sizeof(Vertex_Type) * vertex_count));
+
+	// Unlock the vertex buffer.
+	dx_vertex_buffer->Unmap();
+
+	// Release the vertex array as it is no longer needed.
+	delete [] vertices;
+	vertices = NULL;
+}
+
+//*** Init Vertex Buffer ***
+
+void Init_Vertex_Buffer()
+{
+	D3D10_BUFFER_DESC vertexBufferDesc;
+	D3D10_BUFFER_DESC indexBufferDesc;
+
+	// Set up the description of the dynamic vertex buffer.
+    vertexBufferDesc.Usage = D3D10_USAGE_DYNAMIC;
+    vertexBufferDesc.ByteWidth = sizeof(Vertex_Type) * VERTEX_BUFFER_SIZE;
+    vertexBufferDesc.BindFlags = D3D10_BIND_VERTEX_BUFFER;
+    vertexBufferDesc.CPUAccessFlags = D3D10_CPU_ACCESS_WRITE;
+    vertexBufferDesc.MiscFlags = 0;
+
+	// Now finally create the vertex buffer.
+	dx_device->CreateBuffer( &vertexBufferDesc, NULL, &dx_vertex_buffer );
+
+	// Set up the description of the index buffer.
+    indexBufferDesc.Usage = D3D10_USAGE_DEFAULT;
+    indexBufferDesc.ByteWidth = sizeof(unsigned long) * VERTEX_BUFFER_SIZE;
+    indexBufferDesc.BindFlags = D3D10_BIND_INDEX_BUFFER;
+    indexBufferDesc.CPUAccessFlags = 0;
+    indexBufferDesc.MiscFlags = 0;
+
+	// Create the index buffer.
+	dx_device->CreateBuffer( &indexBufferDesc, NULL, &dx_index_buffer );
 }
 
 //*** Init View Matrix ***
+
 void Init_View_Matrix()
 {
 	D3DXVECTOR3 up, position, lookAt;
@@ -177,10 +273,10 @@ HRESULT Init_Device( int width, int height )
 	D3D10_DEPTH_STENCIL_DESC depthDisabledStencilDesc;
 
 	//set screen limit
-	screen_left = width/2*-1;
-	screen_right = width/2;
-	screen_top = height/2;
-	screen_bottom = height/2*-1;
+	screen_left =	(float)(width/2*-1);
+	screen_right =	(float)(width/2);
+	screen_top =	(float)(height/2);
+	screen_bottom = (float)(height/2*-1);
 
 	// Create a DirectX graphics interface factory.
 	result = CreateDXGIFactory(__uuidof(IDXGIFactory), (void**)&factory);
@@ -559,6 +655,18 @@ void Cleanup_Device()
 	{
 		dx_device->Release();
 		dx_device = NULL;
+	}
+
+	if(dx_vertex_buffer)
+	{
+		dx_vertex_buffer->Release();
+		dx_vertex_buffer = NULL;
+	}
+
+	if(dx_index_buffer)
+	{
+		dx_index_buffer->Release();
+		dx_index_buffer = NULL;
 	}
 }
 

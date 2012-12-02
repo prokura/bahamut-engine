@@ -10,10 +10,9 @@ struct Bitmap
 {
     unsigned width;
     unsigned height;
-    unsigned* data;
 	int x;
 	int y;
-	bool dirty;
+	unsigned* data;
 };
 
 static unsigned bitmap_next = 0;

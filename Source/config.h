@@ -18,5 +18,6 @@ const unsigned REFRESH_RATE = 60;
 const bool VSYNC_ENABLED = true;
 const bool FULL_SCREEN = false;
 const bool MULTI_SAMPLING = true;
+const int VERTEX_BUFFER_SIZE = 2048;
 
 #endif /* config_h */

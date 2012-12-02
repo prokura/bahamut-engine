@@ -21,9 +21,6 @@ BitmapId Create_Bitmap( const char* filename )
 	}
 
     Bitmap* bitmap = &bitmaps[ handle ];
-
-	int w = 0;
-	int h = 0;
 	
 	//unsigned int* image = (unsigned int*) stbi_load( filename, &w, &h, 0, 4 );
 	
@@ -40,9 +37,11 @@ BitmapId Create_Bitmap( const char* filename )
     ressource ->QueryInterface(__uuidof( ID3D10Texture2D), (LPVOID*)&image);
     ressource ->Release();
 
+	int h = 200;
+	int w = 200;
+
     bitmap->width = w;
     bitmap->height = h;
-	bitmap->dirty = false;
     bitmap->data = (unsigned*) malloc( sizeof( unsigned ) * w * h );
     memcpy( bitmap->data, image, sizeof( unsigned ) * w * h );
 
