@@ -1,5 +1,4 @@
 #include "Renderer.h"
-#include "DXRenderer.h"
 #include "Bitmap.h"
 #include "WindowHandler.h"
 #include <assert.h>
@@ -8,19 +7,19 @@
 
 ///*** DirectXValue ***
 
-D3D10_DRIVER_TYPE			dx_driver				= D3D10_DRIVER_TYPE_NULL;
-ID3D10Device*				dx_device				= NULL;
-IDXGISwapChain*				dx_swap_chain			= NULL;
-ID3D10RenderTargetView*		dx_render_target		= NULL;
-ID3D10Texture2D*			dx_depthStencil_buffer	= NULL;
-ID3D10DepthStencilState*	dx_depthStencil_on		= NULL;
-ID3D10DepthStencilState*	dx_depthStencil_off		= NULL;
-ID3D10DepthStencilView*		dx_depthStencil_view	= NULL;
-ID3D10RasterizerState*		dx_raster_state			= NULL;
+static D3D10_DRIVER_TYPE			dx_driver				= D3D10_DRIVER_TYPE_NULL;
+static ID3D10Device*				dx_device				= NULL;
+static IDXGISwapChain*				dx_swap_chain			= NULL;
+static ID3D10RenderTargetView*		dx_render_target		= NULL;
+static ID3D10Texture2D*			dx_depthStencil_buffer	= NULL;
+static ID3D10DepthStencilState*	dx_depthStencil_on		= NULL;
+static ID3D10DepthStencilState*	dx_depthStencil_off		= NULL;
+static ID3D10DepthStencilView*		dx_depthStencil_view	= NULL;
+static ID3D10RasterizerState*		dx_raster_state			= NULL;
 
-ID3D10Buffer*				dx_vertex_buffer		= NULL;
-ID3D10Buffer*				dx_index_buffer			= NULL;
-int							vertex_count			= NULL;
+static ID3D10Buffer*				dx_vertex_buffer		= NULL;
+static ID3D10Buffer*				dx_index_buffer			= NULL;
+static int							vertex_count			= NULL;
 
 struct Vertex_Type
 {
@@ -28,16 +27,16 @@ struct Vertex_Type
 	D3DXVECTOR2 texture;
 };
 
-D3DXMATRIX					dx_mat_projection;
-D3DXMATRIX					dx_mat_world;
-D3DXMATRIX					dx_mat_ortho;
-D3DXMATRIX					dx_mat_view;
+static D3DXMATRIX					dx_mat_projection;
+static D3DXMATRIX					dx_mat_world;
+static D3DXMATRIX					dx_mat_ortho;
+static D3DXMATRIX					dx_mat_view;
 
-float						clear_color[4]			={ 0,0,0,1 };
-float						screen_left				= 0;
-float						screen_right			= 0;
-float						screen_top				= 0;
-float						screen_bottom			= 0;
+static float						clear_color[4]			={ 0,0,0,1 };
+static float						screen_left				= 0;
+static float						screen_right			= 0;
+static float						screen_top				= 0;
+static float						screen_bottom			= 0;
 
 HRESULT Init_Device( int width, int height );
 void Init_View_Matrix();
@@ -46,6 +45,88 @@ void Cleanup_Device();
 void Turn_ZBuffer_On();
 void Turn_ZBuffer_Off();
 void Update_Vertex_Buffer();
+
+
+//*** Texture Interface ***
+
+struct Bitmap
+{
+	unsigned width;
+	unsigned height;
+	int x;
+	int y;
+	unsigned* data;
+};
+
+static unsigned bitmap_next = 0;
+static unsigned bitmap_freelist[ MAX_BITMAPS ];
+static unsigned bitmap_freelist_count = 0;
+static Bitmap bitmaps[ MAX_BITMAPS ];
+
+BitmapId Create_Bitmap( const char* filename )
+{
+	unsigned handle = 0;
+
+	// Create from the free list if we can
+	if( bitmap_freelist_count > 0 )
+	{
+		handle = bitmap_freelist[ bitmap_freelist_count - 1 ];
+		bitmap_freelist_count--;
+	}
+	else // And only expand the range if free list is empty
+	{
+		assert( bitmap_next < MAX_BITMAPS);
+		handle = bitmap_next;
+		bitmap_next++;
+	}
+
+	Bitmap* bitmap = &bitmaps[ handle ];
+
+	//unsigned int* image = (unsigned int*) stbi_load( filename, &w, &h, 0, 4 );
+
+	ID3D10Texture2D* image = NULL;
+	ID3D10Resource* ressource = NULL;
+
+	// Loads the texture into a temporary ID3D10Resource object
+	bool texture_load_fail = SUCCEEDED( D3DX10CreateTextureFromFile( dx_device,filename,NULL,NULL,&ressource,NULL) );
+
+	// Make sure the texture was loaded in successfully
+	assert( texture_load_fail );
+
+	// Translates the ID3D10Resource object into a ID3D10Texture2D object
+	ressource ->QueryInterface(__uuidof( ID3D10Texture2D), (LPVOID*)&image);
+	ressource ->Release();
+
+	int h = 200;
+	int w = 200;
+
+	bitmap->width = w;
+	bitmap->height = h;
+	bitmap->data = (unsigned*) malloc( sizeof( unsigned ) * w * h );
+	memcpy( bitmap->data, image, sizeof( unsigned ) * w * h );
+
+	image->Release();
+
+	return handle;
+}
+
+void Destroy_Bitmap( BitmapId bitmap )
+{
+	assert( bitmap < MAX_BITMAPS );
+
+	bitmap_freelist[ bitmap_freelist_count ] = bitmap;
+	bitmap_freelist_count++;
+	free( bitmaps[ bitmap ].data );
+}
+
+void Clear_All_Bitmap()
+{
+	for( unsigned nBitmap = 0 ; nBitmap < bitmap_next; nBitmap++ )
+	{
+		Destroy_Bitmap( nBitmap );
+	}
+}
+
 
 //*** Initialise ***
 
@@ -680,3 +761,5 @@ void Turn_ZBuffer_Off()
 {
 	dx_device->OMSetDepthStencilState(dx_depthStencil_off, 1);
 }
+
+
