@@ -20,7 +20,8 @@ void Game()
 	component_sprite_create( player, bitmap );
 	*/
 
-	while( running && Window_GetMessage() )
+
+	while( running  && !Window_GetMessage() )
 	{
 		float delta_time = 1.0f/60.0f;
 		// Run systems

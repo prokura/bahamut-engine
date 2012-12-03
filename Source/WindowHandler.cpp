@@ -2,41 +2,16 @@
 
 //*** Windows Api Values ***
 
-HINSTANCE hinstance;
-HWND hwnd;
-WNDCLASSEX wc;
-std::string window_title;
+static HINSTANCE hinstance;
+static HWND hwnd;
+static WNDCLASSEX wc;
+static std::string window_title;
 
 //*** Window Message CallBack ***
 
 static LRESULT CALLBACK WndProc(HWND hwnd, UINT umessage, WPARAM wparam, LPARAM lparam)
 {
-	PAINTSTRUCT ps;
-    HDC hdc;
-
-	switch(umessage)
-	{
-		// Check if the window is being destroyed.
-		case WM_DESTROY:
-			PostQuitMessage(0);
-		break;
-
-		// Check if the window is being closed.
-		case WM_CLOSE:
-			PostQuitMessage(0);		
-		break;
-
-		case WM_PAINT:
-			hdc = BeginPaint( hwnd, &ps );
-            EndPaint( hwnd, &ps );
-		break;
-
-		default:
-			return DefWindowProc(hwnd, umessage, wparam, lparam);
-		break;
-	}
-
-	return 0;
+	return DefWindowProc(hwnd, umessage, wparam, lparam);
 }
 
 //*** Window Init ***
@@ -132,14 +107,13 @@ bool Window_GetMessage()
 {
 	MSG msg = {0};
 
-	if( GetMessage( &msg, NULL, 0, 0 ) )
+	while( PeekMessage(&msg, NULL, 0, 0, PM_REMOVE) == TRUE )
 	{
 		TranslateMessage( &msg );
 		DispatchMessage( &msg );
-		return true;
 	}
 
-	return false;
+	return ( msg.message == WM_QUIT );
 }
 
 //*** Window GetHWND ***
