@@ -11,7 +11,7 @@ void Game()
 {
     bool running = Renderer_Init( 800, 600, "Bahamuto" );
 
-	//Create_Bitmap( "Data\\Image\\blackdragon.png" );
+	Create_Bitmap( "Data\\Image\\blackdragon.png" );
 	
     /*bitmap_handle_t bitmap = renderer_create_bitmap( "white.png" );
 	entity_t player = entity_create();
