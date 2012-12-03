@@ -1,91 +1,48 @@
-////////////////////////////////////////////////////////////////////////////////
-// Filename: texture.fx
-////////////////////////////////////////////////////////////////////////////////
+//--------------------------------------------------------------------------------------
+// basicEffect.fx
+//
+//--------------------------------------------------------------------------------------
 
+matrix World;
+matrix View;
+matrix Projection;
 
-/////////////
-// GLOBALS //
-/////////////
-matrix worldMatrix;
-matrix viewMatrix;
-matrix projectionMatrix;
-Texture2D shaderTexture;
-
-
-///////////////////
-// SAMPLE STATES //
-///////////////////
-SamplerState SampleType
+struct PS_INPUT
 {
-    Filter = MIN_MAG_MIP_LINEAR;
-    AddressU = Wrap;
-    AddressV = Wrap;
+	float4 Pos : SV_POSITION;
+    float4 Color : COLOR0;
 };
 
-
-//////////////
-// TYPEDEFS //
-//////////////
-struct VertexInputType
-{
-    float4 position : POSITION;
-    float2 tex : TEXCOORD0;
-};
-
-struct PixelInputType
-{
-    float4 position : SV_POSITION;
-    float2 tex : TEXCOORD0;
-};
-
-
-////////////////////////////////////////////////////////////////////////////////
+//--------------------------------------------------------------------------------------
 // Vertex Shader
-////////////////////////////////////////////////////////////////////////////////
-PixelInputType TextureVertexShader(VertexInputType input)
+//--------------------------------------------------------------------------------------
+PS_INPUT VS( float4 Pos : POSITION, float4 Color : COLOR )
 {
-    PixelInputType output;
-    
-    
-	// Change the position vector to be 4 units for proper matrix calculations.
-    input.position.w = 1.0f;
-
-	// Calculate the position of the vertex against the world, view, and projection matrices.
-    output.position = mul(input.position, worldMatrix);
-    output.position = mul(output.position, viewMatrix);
-    output.position = mul(output.position, projectionMatrix);
-    
-	// Store the texture coordinates for the pixel shader.
-    output.tex = input.tex;
-    
-	return output;
+	PS_INPUT psInput;
+	
+	Pos = mul( Pos, World );
+    Pos = mul( Pos, View );    
+    psInput.Pos = mul( Pos, Projection );
+	psInput.Color = Color;
+	
+    return psInput;  
 }
 
-
-////////////////////////////////////////////////////////////////////////////////
+//--------------------------------------------------------------------------------------
 // Pixel Shader
-////////////////////////////////////////////////////////////////////////////////
-float4 TexturePixelShader(PixelInputType input) : SV_Target
+//--------------------------------------------------------------------------------------
+float4 PS( PS_INPUT psInput ) : SV_Target
 {
-	float4 textureColor;
-
-
-	// Sample the pixel color from the texture using the sampler at this texture coordinate location.
-	textureColor = shaderTexture.Sample(SampleType, input.tex);
-
-    return textureColor;
+    return psInput.Color; 
 }
 
-
-////////////////////////////////////////////////////////////////////////////////
-// Technique
-////////////////////////////////////////////////////////////////////////////////
-technique10 TextureTechnique
+//--------------------------------------------------------------------------------------
+technique10 Render
 {
-    pass pass0
+    pass P0
     {
-        SetVertexShader(CompileShader(vs_4_0, TextureVertexShader()));
-        SetPixelShader(CompileShader(ps_4_0, TexturePixelShader()));
-        SetGeometryShader(NULL);
+        SetVertexShader( CompileShader( vs_4_0, VS() ) );
+        SetGeometryShader( NULL );
+        SetPixelShader( CompileShader( ps_4_0, PS() ) );
     }
 }

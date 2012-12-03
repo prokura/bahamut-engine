@@ -6,45 +6,39 @@
 #include <d3dx10.h>
 
 ///*** DirectXValue ***
-
-static D3D10_DRIVER_TYPE			dx_driver				= D3D10_DRIVER_TYPE_NULL;
 static ID3D10Device*				dx_device				= NULL;
 static IDXGISwapChain*				dx_swap_chain			= NULL;
 static ID3D10RenderTargetView*		dx_render_target		= NULL;
-static ID3D10Texture2D*			dx_depthStencil_buffer	= NULL;
-static ID3D10DepthStencilState*	dx_depthStencil_on		= NULL;
-static ID3D10DepthStencilState*	dx_depthStencil_off		= NULL;
-static ID3D10DepthStencilView*		dx_depthStencil_view	= NULL;
-static ID3D10RasterizerState*		dx_raster_state			= NULL;
+static D3D10_VIEWPORT				dx_viewport;
+ID3D10RasterizerState*				dx_rasterizer_state		= NULL;
+
+static D3DXMATRIX					dx_view_matrix;
+static D3DXMATRIX					dx_projection_matrix;
+static float						clear_color[4]			={ 0,0,0,1 };
 
 static ID3D10Buffer*				dx_vertex_buffer		= NULL;
-static ID3D10Buffer*				dx_index_buffer			= NULL;
-static int							vertex_count			= NULL;
+static ID3D10InputLayout*			dx_vertex_layout		= NULL;
 
-struct Vertex_Type
+//effects and techniques
+static ID3D10Effect*				dx_basic_effect			= NULL;
+static ID3D10EffectTechnique*		effect_technique		= NULL;
+static ID3D10EffectMatrixVariable*	effect_mat_view			= NULL;
+static ID3D10EffectMatrixVariable*	effect_mat_proj			= NULL;
+static ID3D10EffectMatrixVariable*	effect_mat_world		= NULL;
+
+struct vertex
 {
-	D3DXVECTOR3 position;
-	D3DXVECTOR2 texture;
+      D3DXVECTOR3 pos;
+      D3DXVECTOR4 color;
+
+      vertex( D3DXVECTOR3 p, D3DXVECTOR4 c ) : pos(p), color(c) {}
 };
 
-static D3DXMATRIX					dx_mat_projection;
-static D3DXMATRIX					dx_mat_world;
-static D3DXMATRIX					dx_mat_ortho;
-static D3DXMATRIX					dx_mat_view;
-
-static float						clear_color[4]			={ 0,0,0,1 };
-static float						screen_left				= 0;
-static float						screen_right			= 0;
-static float						screen_top				= 0;
-static float						screen_bottom			= 0;
-
-HRESULT Init_Device( int width, int height );
-void Init_View_Matrix();
-void Init_Vertex_Buffer();
+bool Init_Device( int width, int height );
+bool Init_Shader();
+bool Init_Vertex_Buffer();
+void Setup_Rasterization();
 void Cleanup_Device();
-void Turn_ZBuffer_On();
-void Turn_ZBuffer_Off();
-void Update_Vertex_Buffer();
 
 
 //*** Texture Interface ***
@@ -62,6 +56,8 @@ static unsigned bitmap_next = 0;
 static unsigned bitmap_freelist[ MAX_BITMAPS ];
 static unsigned bitmap_freelist_count = 0;
 static Bitmap bitmaps[ MAX_BITMAPS ];
+
+//*** Create bitmaps ***
 
 BitmapId Create_Bitmap( const char* filename )
 {
@@ -110,6 +106,8 @@ BitmapId Create_Bitmap( const char* filename )
 	return handle;
 }
 
+//*** Destroy bitmaps ***
+
 void Destroy_Bitmap( BitmapId bitmap )
 {
 	assert( bitmap < MAX_BITMAPS );
@@ -119,6 +117,8 @@ void Destroy_Bitmap( BitmapId bitmap )
 	free( bitmaps[ bitmap ].data );
 }
 
+//*** Clear All bitmaps ***
+
 void Clear_All_Bitmap()
 {
 	for( unsigned nBitmap = 0 ; nBitmap < bitmap_next; nBitmap++ )
@@ -127,21 +127,23 @@ void Clear_All_Bitmap()
 	}
 }
 
-
 //*** Initialise ***
 
 bool Renderer_Init( unsigned width, unsigned height, const char* title )
 {
 	Window_Init( width, height, title, FULL_SCREEN );
 
-	if( FAILED( Init_Device(width,height) ) )
+	if( !Init_Device(width,height) )
     {
         Cleanup_Device();
         return false;
     }
 
-	Init_Vertex_Buffer();
-	Init_View_Matrix();
+	if( !Init_Shader() ) return false;
+
+	if( !Init_Vertex_Buffer() ) return false;
+
+	Setup_Rasterization();
 
 	return true;
 }
@@ -159,607 +161,215 @@ void Renderer_Terminate()
 
 void Renderer_Draw()
 {
-	// Clear the back and depth buffer.
+	//clear scene
 	dx_device->ClearRenderTargetView( dx_render_target, clear_color );
-	dx_device->ClearDepthStencilView( dx_depthStencil_view, D3D10_CLEAR_DEPTH, 1.0f, 0);
 
-	// Turn off the Z buffer to begin all 2D rendering.
-	Turn_ZBuffer_Off();
+	//create world matrix
+	static float r;
+	D3DXMATRIX w;
+	D3DXMatrixIdentity(&w);
+	D3DXMatrixRotationY(&w, r);
+	r += 0.001f;
 
-	// Put the bitmap vertex and index buffers on the graphics pipeline to prepare them for drawing.
-	Update_Vertex_Buffer();
+	//set effect matrices
+	effect_mat_world->SetMatrix( w );
+	effect_mat_view->SetMatrix( dx_view_matrix );
+	effect_mat_proj->SetMatrix( dx_projection_matrix );
 
-	unsigned int stride;
-	unsigned int offset;
+	//fill vertex buffer with vertices
+	UINT numVertices = 3;
+	vertex* v = NULL;
 
-	// Set vertex buffer stride and offset.
-    stride = sizeof(Vertex_Type); 
-	offset = 0;
-    
-	// Set the vertex buffer to active in the input assembler so it can be rendered.
-	dx_device->IASetVertexBuffers(0, 1, &dx_vertex_buffer, &stride, &offset);
+	//lock vertex buffer for CPU use
+	dx_vertex_buffer->Map(D3D10_MAP_WRITE_DISCARD, 0, (void**) &v );
 
-    // Set the index buffer to active in the input assembler so it can be rendered.
-    dx_device->IASetIndexBuffer(dx_index_buffer, DXGI_FORMAT_R32_UINT, 0);
+	v[0] = vertex( D3DXVECTOR3(-1,-1,0), D3DXVECTOR4(1,0,0,1) );
+	v[1] = vertex( D3DXVECTOR3(0,1,0), D3DXVECTOR4(0,1,0,1) );
+	v[2] = vertex( D3DXVECTOR3(1,-1,0), D3DXVECTOR4(0,0,1,1) );
 
-    // Set the type of primitive that should be rendered from this vertex buffer, in this case triangles.
-    dx_device->IASetPrimitiveTopology(D3D10_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-
-	// Turn the Z buffer back on now that all 2D rendering has completed.
-	Turn_ZBuffer_On();
-
-	if( VSYNC_ENABLED )
-	{
-		// Lock to screen refresh rate.
-		dx_swap_chain->Present(1, 0);
-	}
-	else
-	{
-		// Present as fast as possible.
-		dx_swap_chain->Present(0, 0);
-	}
-
-}
-
-//*** Get Device() ***
-
-ID3D10Device* Get_Device()
-{
-	return dx_device;
-}
-
-//*** Update Vertex Buffer
-
-void Update_Vertex_Buffer()
-{
-	Bitmap bitmap = bitmaps[0];
-
-	float left		= (float)bitmap.x;
-	float right		= (float)bitmap.x + bitmap.width;
-	float top		= (float)bitmap.y;
-	float bottom	= (float)bitmap.y + bitmap.height;
-
-	vertex_count = 6;
-
-	// Create the vertex array.
-	Vertex_Type* vertices = new Vertex_Type[vertex_count];
-
-	// Load the vertex array with data.
-	vertices[0].position = D3DXVECTOR3(left, top, 0.0f);  // Top left.
-	vertices[0].texture = D3DXVECTOR2(0.0f, 0.0f);
-	vertices[1].position = D3DXVECTOR3(right, bottom, 0.0f);  // Bottom right.
-	vertices[1].texture = D3DXVECTOR2(1.0f, 1.0f);
-	vertices[2].position = D3DXVECTOR3(left, bottom, 0.0f);  // Bottom left.
-	vertices[2].texture = D3DXVECTOR2(0.0f, 1.0f);
-
-	vertices[3].position = D3DXVECTOR3(left, top, 0.0f);  // Top left.
-	vertices[3].texture = D3DXVECTOR2(0.0f, 0.0f);
-	vertices[4].position = D3DXVECTOR3(right, top, 0.0f);  // Top right.
-	vertices[4].texture = D3DXVECTOR2(1.0f, 0.0f);
-	vertices[5].position = D3DXVECTOR3(right, bottom, 0.0f);  // Bottom right.
-	vertices[5].texture = D3DXVECTOR2(1.0f, 1.0f);
-
-	// Initialize the vertex buffer pointer to null first.
-	void* verticesPtr = NULL;
-
-	// Lock the vertex buffer.
-	HRESULT lock_vBuffer = dx_vertex_buffer->Map(D3D10_MAP_WRITE_DISCARD, 0, (void**)&verticesPtr);
-	
-	assert( SUCCEEDED(lock_vBuffer) );
-
-	// Copy the data into the vertex buffer.
-	memcpy(verticesPtr, (void*)vertices, (sizeof(Vertex_Type) * vertex_count));
-
-	// Unlock the vertex buffer.
 	dx_vertex_buffer->Unmap();
 
-	// Release the vertex array as it is no longer needed.
-	delete [] vertices;
-	vertices = NULL;
+		// Set primitive topology 
+	dx_device->IASetPrimitiveTopology( D3D10_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP );
+
+	//get technique desc
+	D3D10_TECHNIQUE_DESC techDesc;
+	effect_technique->GetDesc( &techDesc );
+	
+	for( UINT p = 0; p < techDesc.Passes; ++p )
+	{
+		//apply technique
+		effect_technique->GetPassByIndex( p )->Apply( 0 );
+				
+		//draw
+		dx_device->Draw( numVertices, 0 );
+	}
+
+
+	//flip buffers
+	dx_swap_chain->Present(0,0);
+}
+
+
+//*** Init Directx Device ***
+
+bool Init_Device( int width, int height )
+{
+	//Set up DX swap chain
+	DXGI_SWAP_CHAIN_DESC swapChainDesc;
+	ZeroMemory(&swapChainDesc, sizeof(swapChainDesc));
+
+	//set buffer dimensions and format
+	swapChainDesc.BufferCount = 2;
+	swapChainDesc.BufferDesc.Width = width;
+	swapChainDesc.BufferDesc.Height = height;
+	swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
+	swapChainDesc.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;;
+
+	//set refresh rate
+	swapChainDesc.BufferDesc.RefreshRate.Numerator = 60;
+	swapChainDesc.BufferDesc.RefreshRate.Denominator = 1;
+
+	//sampling settings
+	swapChainDesc.SampleDesc.Quality = 0;
+	swapChainDesc.SampleDesc.Count = 1;
+
+	//output window handle
+	swapChainDesc.OutputWindow = Window_GetHWND();
+	swapChainDesc.Windowed = true;
+
+	//Create the D3D device
+	if ( FAILED( D3D10CreateDeviceAndSwapChain(	NULL,D3D10_DRIVER_TYPE_HARDWARE,NULL,0,D3D10_SDK_VERSION,&swapChainDesc,&dx_swap_chain,&dx_device) ) )
+			return false;
+
+	//try to get the back buffer
+	ID3D10Texture2D* pBackBuffer;
+
+	if ( FAILED( dx_swap_chain->GetBuffer(0, __uuidof(ID3D10Texture2D), (LPVOID*)&pBackBuffer) ) ) return false;
+
+	//try to create render target view
+	if ( FAILED( dx_device->CreateRenderTargetView(pBackBuffer, NULL, &dx_render_target) ) ) return false;
+
+	//release the back buffer
+	pBackBuffer->Release();
+
+	//set the render target
+	dx_device->OMSetRenderTargets(1, &dx_render_target, NULL);
+
+	//create viewport structure
+	dx_viewport.Width = width;
+	dx_viewport.Height = height;
+	dx_viewport.MinDepth = 0.0f;
+	dx_viewport.MaxDepth = 1.0f;
+	dx_viewport.TopLeftX = 0;
+	dx_viewport.TopLeftY = 0;
+
+	//set the viewport
+	dx_device->RSSetViewports(1, &dx_viewport);
+
+	// Set up the view matrix
+	D3DXVECTOR3 eye(0.0f, 0.0f, -5.0f);
+	D3DXVECTOR3 view(0.0f, 0.0f, 1.0f);
+	D3DXVECTOR3 up(0.0f, 1.0f, 0.0f);
+
+	D3DXMatrixLookAtLH( &dx_view_matrix, &eye, &view, &up );
+
+	//Set up projection matrix
+	//D3DXMatrixOrthoLH(&dx_projection_matrix, width, height, 0.1f, 100.0f );
+	D3DXMatrixPerspectiveFovLH(&dx_projection_matrix, (float)D3DX_PI * 0.5f, (float)width/height, 0.1f, 100.0f);
+
+	return true;
+}
+
+//*** Init Shader ***
+
+bool Init_Shader()
+{
+	if ( FAILED( D3DX10CreateEffectFromFile( "Data\\Shader\\texture.fx",NULL,NULL,
+		"fx_4_0",D3D10_SHADER_ENABLE_STRICTNESS,0,dx_device,NULL, NULL,&dx_basic_effect,NULL, NULL  ) ) )
+		return false;
+
+	effect_technique	= dx_basic_effect->GetTechniqueByName("Render");
+
+	//create matrix effect pointers
+	effect_mat_view		= dx_basic_effect->GetVariableByName( "View" )->AsMatrix();
+	effect_mat_proj		= dx_basic_effect->GetVariableByName( "Projection" )->AsMatrix();
+	effect_mat_world	= dx_basic_effect->GetVariableByName( "World" )->AsMatrix();
+
+	//tell directx how to handle vertex format we defined in the vcertex struct
+	D3D10_INPUT_ELEMENT_DESC layout[] =
+	{
+		{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT,0, 0, D3D10_INPUT_PER_VERTEX_DATA, 0 },
+		{ "COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT,0, 12, D3D10_INPUT_PER_VERTEX_DATA, 0 }
+	};
+
+	UINT numElements = 2;
+	D3D10_PASS_DESC PassDesc;
+	effect_technique->GetPassByIndex( 0 )->GetDesc( &PassDesc );
+
+	if ( FAILED( dx_device->CreateInputLayout( layout,numElements,PassDesc.pIAInputSignature,PassDesc.IAInputSignatureSize,&dx_vertex_layout) ) ) 
+		return false;
+
+	// Set the input layout
+	dx_device->IASetInputLayout( dx_vertex_layout );
+
+	return true;
 }
 
 //*** Init Vertex Buffer ***
 
-void Init_Vertex_Buffer()
+bool Init_Vertex_Buffer()
 {
-	D3D10_BUFFER_DESC vertexBufferDesc;
-	D3D10_BUFFER_DESC indexBufferDesc;
+	UINT numVertices = VERTEX_BUFFER_SIZE;
 
-	// Set up the description of the dynamic vertex buffer.
-    vertexBufferDesc.Usage = D3D10_USAGE_DYNAMIC;
-    vertexBufferDesc.ByteWidth = sizeof(Vertex_Type) * VERTEX_BUFFER_SIZE;
-    vertexBufferDesc.BindFlags = D3D10_BIND_VERTEX_BUFFER;
-    vertexBufferDesc.CPUAccessFlags = D3D10_CPU_ACCESS_WRITE;
-    vertexBufferDesc.MiscFlags = 0;
+	D3D10_BUFFER_DESC bd;
+	bd.Usage = D3D10_USAGE_DYNAMIC;
+	bd.ByteWidth = sizeof( vertex ) * numVertices; //total size of buffer in bytes
+	bd.BindFlags = D3D10_BIND_VERTEX_BUFFER;
+	bd.CPUAccessFlags = D3D10_CPU_ACCESS_WRITE;
+	bd.MiscFlags = 0;
 
-	// Now finally create the vertex buffer.
-	dx_device->CreateBuffer( &vertexBufferDesc, NULL, &dx_vertex_buffer );
+	if ( FAILED( dx_device->CreateBuffer( &bd, NULL, &dx_vertex_buffer ) ) ) return false;
 
-	// Set up the description of the index buffer.
-    indexBufferDesc.Usage = D3D10_USAGE_DEFAULT;
-    indexBufferDesc.ByteWidth = sizeof(unsigned long) * VERTEX_BUFFER_SIZE;
-    indexBufferDesc.BindFlags = D3D10_BIND_INDEX_BUFFER;
-    indexBufferDesc.CPUAccessFlags = 0;
-    indexBufferDesc.MiscFlags = 0;
+	// Set vertex buffer
+	UINT stride = sizeof( vertex );
+	UINT offset = 0;
+	dx_device->IASetVertexBuffers( 0, 1, &dx_vertex_buffer, &stride, &offset );
 
-	// Create the index buffer.
-	dx_device->CreateBuffer( &indexBufferDesc, NULL, &dx_index_buffer );
+	return true;
 }
 
-//*** Init View Matrix ***
+//*** Set Up Rasterization ***
 
-void Init_View_Matrix()
+void Setup_Rasterization()
 {
-	D3DXVECTOR3 up, position, lookAt;
-	float yaw, pitch, roll;
-	D3DXMATRIX rotationMatrix;
-
-	// Setup the vector that points upwards.
-	up.x = 0.0f;
-	up.y = 1.0f;
-	up.z = 0.0f;
-
-	// Setup the position of the camera in the world.
-	position.x = 0;
-	position.y = 0;
-	position.z = 0;
-
-	// Setup where the camera is looking by default.
-	lookAt.x = 0.0f;
-	lookAt.y = 0.0f;
-	lookAt.z = 1.0f;
-
-	// Set the yaw (Y axis), pitch (X axis), and roll (Z axis) rotations in radians.
-	pitch = 0;
-	yaw   = 0;
-	roll  = 0;
-
-	// Create the rotation matrix from the yaw, pitch, and roll values.
-	D3DXMatrixRotationYawPitchRoll(&rotationMatrix, yaw, pitch, roll);
-
-	// Transform the lookAt and up vector by the rotation matrix so the view is correctly rotated at the origin.
-	D3DXVec3TransformCoord(&lookAt, &lookAt, &rotationMatrix);
-	D3DXVec3TransformCoord(&up, &up, &rotationMatrix);
-
-	// Translate the rotated camera position to the location of the viewer.
-	lookAt = position + lookAt;
-
-	// Finally create the view matrix from the three updated vectors.
-	D3DXMatrixLookAtLH(&dx_mat_view, &position, &lookAt, &up);
-}
-
-//*** Init Directx Device ***
-
-HRESULT Init_Device( int width, int height )
-{
-	HRESULT result;
-	IDXGIFactory* factory;
-	IDXGIAdapter* adapter;
-	IDXGIOutput* adapterOutput;
-	unsigned numModes = 0;
-	unsigned numerator = 0;
-	unsigned denominator = 0;
-	unsigned stringLength = 0;
-	DXGI_MODE_DESC* displayModeList;
-	DXGI_ADAPTER_DESC adapterDesc;
-	int error = 0;
-	DXGI_SWAP_CHAIN_DESC swapChainDesc;
-	ID3D10Texture2D* backBufferPtr;
-	D3D10_TEXTURE2D_DESC depthBufferDesc;
-	D3D10_DEPTH_STENCIL_DESC depthStencilDesc;
-	D3D10_DEPTH_STENCIL_VIEW_DESC depthStencilViewDesc;
-	D3D10_VIEWPORT viewport;
-	float fieldOfView, screenAspect;
-	D3D10_RASTERIZER_DESC rasterDesc;
-	D3D10_DEPTH_STENCIL_DESC depthDisabledStencilDesc;
-
-	//set screen limit
-	screen_left =	(float)(width/2*-1);
-	screen_right =	(float)(width/2);
-	screen_top =	(float)(height/2);
-	screen_bottom = (float)(height/2*-1);
-
-	// Create a DirectX graphics interface factory.
-	result = CreateDXGIFactory(__uuidof(IDXGIFactory), (void**)&factory);
-	if(FAILED(result))
-	{
-		return false;
-	}
-
-	// Use the factory to create an adapter for the primary graphics interface (video card).
-	result = factory->EnumAdapters(0, &adapter);
-	if(FAILED(result))
-	{
-		return false;
-	}
-
-	// Enumerate the primary adapter output (monitor).
-	result = adapter->EnumOutputs(0, &adapterOutput);
-	if(FAILED(result))
-	{
-		return false;
-	}
-
-	// Get the number of modes that fit the DXGI_FORMAT_R8G8B8A8_UNORM display format for the adapter output (monitor).
-	result = adapterOutput->GetDisplayModeList(DXGI_FORMAT_R8G8B8A8_UNORM, DXGI_ENUM_MODES_INTERLACED, &numModes, NULL);
-	if(FAILED(result))
-	{
-		return false;
-	}
-
-	// Create a list to hold all the possible display modes for this monitor/video card combination.
-	displayModeList = new DXGI_MODE_DESC[numModes];
-	if(!displayModeList)
-	{
-		return false;
-	}
-
-	// Now fill the display mode list structures.
-	result = adapterOutput->GetDisplayModeList(DXGI_FORMAT_R8G8B8A8_UNORM, DXGI_ENUM_MODES_INTERLACED, &numModes, displayModeList);
-	if(FAILED(result))
-	{
-		return false;
-	}
-
-	// Now go through all the display modes and find the one that matches the screen width and height.
-	// When a match is found store the numerator and denominator of the refresh rate for that monitor.
-	for(unsigned i=0; i<numModes; i++)
-	{
-		if(displayModeList[i].Width == (unsigned int)width)
-		{
-			if(displayModeList[i].Height == (unsigned int)height)
-			{
-				numerator = displayModeList[i].RefreshRate.Numerator;
-				denominator = displayModeList[i].RefreshRate.Denominator;
-			}
-		}
-	}
-
-	// Get the adapter (video card) description.
-	result = adapter->GetDesc(&adapterDesc);
-	if(FAILED(result))
-	{
-		return false;
-	}
-
-	// Store the dedicated video card memory in megabytes.
-	//video_Card_Memory = (int)(adapterDesc.DedicatedVideoMemory / 1024 / 1024);
-
-	// Convert the name of the video card to a character array and store it.
-	/*char videoCardDescription[128];
-	error = wcstombs_s(&stringLength, videoCardDescription, 128, adapterDesc.Description, 128);
-	if(error != 0)
-	{
-		return false;
-	}*/
-
-	// Release the display mode list.
-	delete [] displayModeList;
-	displayModeList = 0;
-
-	// Release the adapter output.
-	adapterOutput->Release();
-	adapterOutput = 0;
-
-	// Release the adapter.
-	adapter->Release();
-	adapter = 0;
-
-	// Release the factory.
-	factory->Release();
-	factory = 0;
-
-	// Initialize the swap chain description.
-    ZeroMemory(&swapChainDesc, sizeof(swapChainDesc));
-
-	// Set to a single back buffer.
-    swapChainDesc.BufferCount = 1;
-
-	// Set the width and height of the back buffer.
-    swapChainDesc.BufferDesc.Width = width;
-    swapChainDesc.BufferDesc.Height = height;
-
-	// Set regular 32-bit surface for the back buffer.
-    swapChainDesc.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-
-	// Set the refresh rate of the back buffer.
-	if(VSYNC_ENABLED)
-	{
-	    swapChainDesc.BufferDesc.RefreshRate.Numerator = numerator;
-		swapChainDesc.BufferDesc.RefreshRate.Denominator = denominator;
-	}
-	else
-	{
-	    swapChainDesc.BufferDesc.RefreshRate.Numerator = 0;
-		swapChainDesc.BufferDesc.RefreshRate.Denominator = 1;
-	}
-
-	// Set the usage of the back buffer.
-    swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-
-	// Set the handle for the window to render to.
-	swapChainDesc.OutputWindow = Window_GetHWND();
-
-	// Turn multisampling off.
-    swapChainDesc.SampleDesc.Count = 1;
-    swapChainDesc.SampleDesc.Quality = 0;
-
-	// Set to full screen or windowed mode.
-	if(FULL_SCREEN)
-	{
-		swapChainDesc.Windowed = false;
-	}
-	else
-	{
-		swapChainDesc.Windowed = true;
-	}
-
-	// Set the scan line ordering and scaling to unspecified.
-	swapChainDesc.BufferDesc.ScanlineOrdering = DXGI_MODE_SCANLINE_ORDER_UNSPECIFIED;
-	swapChainDesc.BufferDesc.Scaling = DXGI_MODE_SCALING_UNSPECIFIED;
-
-	// Discard the back buffer contents after presenting.
-	swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_DISCARD;
-
-	// Don't set the advanced flags.
-	swapChainDesc.Flags = 0;
-
-	// Create the swap chain and the Direct3D device.
-	result = D3D10CreateDeviceAndSwapChain(NULL, D3D10_DRIVER_TYPE_HARDWARE, NULL, 0, D3D10_SDK_VERSION, &swapChainDesc, &dx_swap_chain, &dx_device);
-	if(FAILED(result))
-	{
-		return false;
-	}
-
-	// Get the pointer to the back buffer.
-	result = dx_swap_chain->GetBuffer(0, __uuidof(ID3D10Texture2D), (LPVOID*)&backBufferPtr);
-	if(FAILED(result))
-	{
-		return false;
-	}
-
-	// Create the render target view with the back buffer pointer.
-	result = dx_device->CreateRenderTargetView(backBufferPtr, NULL, &dx_render_target);
-	if(FAILED(result))
-	{
-		return false;
-	}
-
-	// Release pointer to the back buffer as we no longer need it.
-	backBufferPtr->Release();
-	backBufferPtr = 0;
-
-	// Initialize the description of the depth buffer.
-	ZeroMemory(&depthBufferDesc, sizeof(depthBufferDesc));
-
-	// Set up the description of the depth buffer.
-	depthBufferDesc.Width = width;
-	depthBufferDesc.Height = height;
-	depthBufferDesc.MipLevels = 1;
-	depthBufferDesc.ArraySize = 1;
-	depthBufferDesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
-	depthBufferDesc.SampleDesc.Count = 1;
-	depthBufferDesc.SampleDesc.Quality = 0;
-	depthBufferDesc.Usage = D3D10_USAGE_DEFAULT;
-	depthBufferDesc.BindFlags = D3D10_BIND_DEPTH_STENCIL;
-	depthBufferDesc.CPUAccessFlags = 0;
-	depthBufferDesc.MiscFlags = 0;
-
-	// Create the texture for the depth buffer using the filled out description.
-	result = dx_device->CreateTexture2D(&depthBufferDesc, NULL, &dx_depthStencil_buffer);
-	if(FAILED(result))
-	{
-		return false;
-	}
-
-	// Initialize the description of the stencil state.
-	ZeroMemory(&depthStencilDesc, sizeof(depthStencilDesc));
-
-	// Set up the description of the stencil state.
-	depthStencilDesc.DepthEnable = true;
-	depthStencilDesc.DepthWriteMask = D3D10_DEPTH_WRITE_MASK_ALL;
-	depthStencilDesc.DepthFunc = D3D10_COMPARISON_LESS;
-
-	depthStencilDesc.StencilEnable = true;
-	depthStencilDesc.StencilReadMask = 0xFF;
-	depthStencilDesc.StencilWriteMask = 0xFF;
-
-	// Stencil operations if pixel is front-facing.
-	depthStencilDesc.FrontFace.StencilFailOp = D3D10_STENCIL_OP_KEEP;
-	depthStencilDesc.FrontFace.StencilDepthFailOp = D3D10_STENCIL_OP_INCR;
-	depthStencilDesc.FrontFace.StencilPassOp = D3D10_STENCIL_OP_KEEP;
-	depthStencilDesc.FrontFace.StencilFunc = D3D10_COMPARISON_ALWAYS;
-
-	// Stencil operations if pixel is back-facing.
-	depthStencilDesc.BackFace.StencilFailOp = D3D10_STENCIL_OP_KEEP;
-	depthStencilDesc.BackFace.StencilDepthFailOp = D3D10_STENCIL_OP_DECR;
-	depthStencilDesc.BackFace.StencilPassOp = D3D10_STENCIL_OP_KEEP;
-	depthStencilDesc.BackFace.StencilFunc = D3D10_COMPARISON_ALWAYS;
-
-	// Create the depth stencil state.
-	result = dx_device->CreateDepthStencilState(&depthStencilDesc, &dx_depthStencil_on);
-	if(FAILED(result))
-	{
-		return false;
-	}
-
-	// Set the depth stencil state on the D3D device.
-	dx_device->OMSetDepthStencilState(dx_depthStencil_on, 1);
-
-	// Initialize the depth stencil view.
-	ZeroMemory(&depthStencilViewDesc, sizeof(depthStencilViewDesc));
-
-	// Set up the depth stencil view description.
-	depthStencilViewDesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
-	depthStencilViewDesc.ViewDimension = D3D10_DSV_DIMENSION_TEXTURE2D;
-	depthStencilViewDesc.Texture2D.MipSlice = 0;
-
-	// Create the depth stencil view.
-	result = dx_device->CreateDepthStencilView(dx_depthStencil_buffer, &depthStencilViewDesc, &dx_depthStencil_view);
-	if(FAILED(result))
-	{
-		return false;
-	}
-
-	// Bind the render target view and depth stencil buffer to the output render pipeline.
-	dx_device->OMSetRenderTargets(1, &dx_render_target, dx_depthStencil_view);
-
-	// Setup the raster description which will determine how and what polygons will be drawn.
-	rasterDesc.AntialiasedLineEnable = false;
-	rasterDesc.CullMode = D3D10_CULL_BACK;
-	rasterDesc.DepthBias = 0;
-	rasterDesc.DepthBiasClamp = 0.0f;
-	rasterDesc.DepthClipEnable = true;
-	rasterDesc.FillMode = D3D10_FILL_SOLID;
-	rasterDesc.FrontCounterClockwise = false;
-	rasterDesc.MultisampleEnable = MULTI_SAMPLING;
-	rasterDesc.ScissorEnable = false;
-	rasterDesc.SlopeScaledDepthBias = 0.0f;
-
-	// Create the rasterizer state from the description we just filled out.
-	result = dx_device->CreateRasterizerState(&rasterDesc, &dx_raster_state);
-	if(FAILED(result))
-	{
-		return false;
-	}
-
-	// Now set the rasterizer state.
-	dx_device->RSSetState(dx_raster_state);
-
-	// Setup the viewport for rendering.
-    viewport.Width = width;
-    viewport.Height = height;
-    viewport.MinDepth = 0.0f;
-    viewport.MaxDepth = 1.0f;
-    viewport.TopLeftX = 0;
-    viewport.TopLeftY = 0;
-
-	// Create the viewport.
-	dx_device->RSSetViewports(1, &viewport);
-
-	// Setup the projection matrix.
-	fieldOfView = (float)D3DX_PI / 4.0f;
-	screenAspect = (float)width / (float)height;
-
-	// Create the projection matrix for 3D rendering.
-	D3DXMatrixPerspectiveFovLH(&dx_mat_projection, fieldOfView, screenAspect, 0, 1);
-
-    // Initialize the world matrix to the identity matrix.
-	D3DXMatrixIdentity(&dx_mat_world);
-
-	// Create an orthographic projection matrix for 2D rendering.
-	D3DXMatrixOrthoLH(&dx_mat_ortho, (float)width, (float)height, 0, 1);
-
-	// Clear the second depth stencil state before setting the parameters.
-	ZeroMemory(&depthDisabledStencilDesc, sizeof(depthDisabledStencilDesc));
-
-	// Now create a second depth stencil state which turns off the Z buffer for 2D rendering.  The only difference is 
-	// that DepthEnable is set to false, all other parameters are the same as the other depth stencil state.
-	depthDisabledStencilDesc.DepthEnable = false;
-	depthDisabledStencilDesc.DepthWriteMask = D3D10_DEPTH_WRITE_MASK_ALL;
-	depthDisabledStencilDesc.DepthFunc = D3D10_COMPARISON_LESS;
-	depthDisabledStencilDesc.StencilEnable = true;
-	depthDisabledStencilDesc.StencilReadMask = 0xFF;
-	depthDisabledStencilDesc.StencilWriteMask = 0xFF;
-	depthDisabledStencilDesc.FrontFace.StencilFailOp = D3D10_STENCIL_OP_KEEP;
-	depthDisabledStencilDesc.FrontFace.StencilDepthFailOp = D3D10_STENCIL_OP_INCR;
-	depthDisabledStencilDesc.FrontFace.StencilPassOp = D3D10_STENCIL_OP_KEEP;
-	depthDisabledStencilDesc.FrontFace.StencilFunc = D3D10_COMPARISON_ALWAYS;
-	depthDisabledStencilDesc.BackFace.StencilFailOp = D3D10_STENCIL_OP_KEEP;
-	depthDisabledStencilDesc.BackFace.StencilDepthFailOp = D3D10_STENCIL_OP_DECR;
-	depthDisabledStencilDesc.BackFace.StencilPassOp = D3D10_STENCIL_OP_KEEP;
-	depthDisabledStencilDesc.BackFace.StencilFunc = D3D10_COMPARISON_ALWAYS;
-
-	// Create the state using the device.
-	result = dx_device->CreateDepthStencilState(&depthDisabledStencilDesc, &dx_depthStencil_off);
-	if(FAILED(result))
-	{
-		return false;
-	}
-
-    return true;
+	D3D10_RASTERIZER_DESC rasterizerState;
+	rasterizerState.CullMode = D3D10_CULL_NONE;
+	rasterizerState.FillMode = D3D10_FILL_SOLID;
+	rasterizerState.FrontCounterClockwise = true;
+	rasterizerState.DepthBias = false;
+	rasterizerState.DepthBiasClamp = 0;
+	rasterizerState.SlopeScaledDepthBias = 0;
+	rasterizerState.DepthClipEnable = true;
+	rasterizerState.ScissorEnable = false;
+	rasterizerState.MultisampleEnable = false;
+	rasterizerState.AntialiasedLineEnable = true;
+
+	dx_device->CreateRasterizerState( &rasterizerState, &dx_rasterizer_state );
+	dx_device->RSSetState( dx_rasterizer_state );
 }
 
 //*** Cleanup Device ***
 
 void Cleanup_Device()
 {
-	// Before shutting down set to windowed mode or when you release the swap chain it will throw an exception.
-	if(dx_swap_chain)
-	{
-		dx_swap_chain->SetFullscreenState(false, NULL);
-	}
-
-	if(dx_depthStencil_off)
-	{
-		dx_depthStencil_off->Release();
-		dx_depthStencil_off = 0;
-	}
-
-	if(dx_raster_state)
-	{
-		dx_raster_state->Release();
-		dx_raster_state = NULL;
-	}
-
-	if(dx_depthStencil_view)
-	{
-		dx_depthStencil_view->Release();
-		dx_depthStencil_view = NULL;
-	}
-
-	if(dx_depthStencil_on)
-	{
-		dx_depthStencil_on->Release();
-		dx_depthStencil_on = NULL;
-	}
-
-	if(dx_depthStencil_buffer)
-	{
-		dx_depthStencil_buffer->Release();
-		dx_depthStencil_buffer = NULL;
-	}
-
-	if(dx_render_target)
-	{
-		dx_render_target->Release();
-		dx_render_target = NULL;
-	}
-
-	if(dx_swap_chain)
-	{
-		dx_swap_chain->Release();
-		dx_swap_chain = NULL;
-	}
-
-	if(dx_device)
-	{
-		dx_device->Release();
-		dx_device = NULL;
-	}
-
-	if(dx_vertex_buffer)
-	{
-		dx_vertex_buffer->Release();
-		dx_vertex_buffer = NULL;
-	}
-
-	if(dx_index_buffer)
-	{
-		dx_index_buffer->Release();
-		dx_index_buffer = NULL;
-	}
-}
-
-void Turn_ZBuffer_On()
-{
-	dx_device->OMSetDepthStencilState(dx_depthStencil_on, 1);
-}
-
-
-void Turn_ZBuffer_Off()
-{
-	dx_device->OMSetDepthStencilState(dx_depthStencil_off, 1);
+	if ( dx_render_target ) dx_render_target->Release();
+	if ( dx_swap_chain ) dx_swap_chain->Release();
+	if ( dx_device ) dx_device->Release();
+	if ( dx_vertex_buffer ) dx_vertex_buffer->Release();
+	if ( dx_vertex_layout ) dx_vertex_layout->Release();
+	if ( dx_rasterizer_state ) dx_rasterizer_state->Release();
+	if ( dx_basic_effect ) dx_basic_effect->Release();
 }
 
 
