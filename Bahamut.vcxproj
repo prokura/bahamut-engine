@@ -11,7 +11,6 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Source\DXBitmap.cpp" />
     <ClCompile Include="Source\DXRenderer.cpp" />
     <ClCompile Include="Source\Entity.cpp" />
     <ClCompile Include="Source\float2.cpp" />
@@ -23,7 +22,6 @@
   <ItemGroup>
     <ClInclude Include="Source\Bitmap.h" />
     <ClInclude Include="source\config.h" />
-    <ClInclude Include="Source\DXRenderer.h" />
     <ClInclude Include="Source\Entity.h" />
     <ClInclude Include="Source\float2.h" />
     <ClInclude Include="Source\float3.h" />
@@ -59,10 +57,10 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <IncludePath>C:\Soft\DXSDK\Include;$(IncludePath)</IncludePath>
+    <IncludePath>C:\Program Files %28x86%29\Microsoft DirectX SDK %28June 2010%29\Include;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <LibraryPath>C:\Soft\DXSDK\Lib\x86;$(LibraryPath)</LibraryPath>
+    <LibraryPath>C:\Program Files %28x86%29\Microsoft DirectX SDK %28June 2010%29\Lib\x86;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <IncludePath>C:\Soft\DXSDK\Include;$(IncludePath)</IncludePath>

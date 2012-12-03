@@ -50,9 +50,6 @@
     <ClCompile Include="Source\WindowHandler.cpp">
       <Filter>Source Files\WindowHandler\Windows</Filter>
     </ClCompile>
-    <ClCompile Include="Source\DXBitmap.cpp">
-      <Filter>Source Files\Renderer\DirectX</Filter>
-    </ClCompile>
     <ClCompile Include="Source\main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -78,9 +75,6 @@
     </ClInclude>
     <ClInclude Include="source\config.h">
       <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\DXRenderer.h">
-      <Filter>Source Files\Renderer\DirectX</Filter>
     </ClInclude>
     <ClInclude Include="Source\Bitmap.h">
       <Filter>Source Files\Renderer</Filter>
