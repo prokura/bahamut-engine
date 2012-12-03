@@ -3,6 +3,14 @@
 //
 //--------------------------------------------------------------------------------------
 
+Texture2D tex2D;
+SamplerState linearSampler
+{
+    Filter = MIN_MAG_MIP_LINEAR;
+    AddressU = Wrap;
+    AddressV = Wrap;
+};
+
 matrix World;
 matrix View;
 matrix Projection;
@@ -10,39 +18,66 @@ matrix Projection;
 struct PS_INPUT
 {
 	float4 Pos : SV_POSITION;
-    float4 Color : COLOR0;
+    float4 Color : COLOR;
+    float2 Tex : TEXCOORD;
+};
+
+struct VS_INPUT
+{
+	float4 Pos : POSITION;
+    float4 Color : COLOR;
+    float2 Tex : TEXCOORD;
 };
 
 //--------------------------------------------------------------------------------------
 // Vertex Shader
 //--------------------------------------------------------------------------------------
-PS_INPUT VS( float4 Pos : POSITION, float4 Color : COLOR )
+PS_INPUT VS( VS_INPUT input )
 {
-	PS_INPUT psInput;
+	PS_INPUT output;
 	
-	Pos = mul( Pos, World );
-    Pos = mul( Pos, View );    
-    psInput.Pos = mul( Pos, Projection );
-	psInput.Color = Color;
+	output.Pos = mul( input.Pos, World );
+    output.Pos = mul( output.Pos, View );    
+    output.Pos = mul( output.Pos, Projection );
+	output.Color = input.Color;
+	output.Tex = input.Tex;
 	
-    return psInput;  
+    return output;  
 }
 
 //--------------------------------------------------------------------------------------
 // Pixel Shader
 //--------------------------------------------------------------------------------------
-float4 PS( PS_INPUT psInput ) : SV_Target
+float4 textured( PS_INPUT input ) : SV_Target
 {
-    return psInput.Color; 
+    return tex2D.Sample( linearSampler, input.Tex ); 
 }
 
+float4 noTexture( PS_INPUT input ) : SV_Target
+{
+    return input.Color; 
+}
+
+
 //--------------------------------------------------------------------------------------
-technique10 Render
+// Techniques
+//--------------------------------------------------------------------------------------
+technique10 full
 {
     pass P0
     {
         SetVertexShader( CompileShader( vs_4_0, VS() ) );
         SetGeometryShader( NULL );
-        SetPixelShader( CompileShader( ps_4_0, PS() ) );
+        SetPixelShader( CompileShader( ps_4_0, textured() ) );
+    }
+}
+
+technique10 texturingDisabled
+{
+    pass P0
+    {
+        SetVertexShader( CompileShader( vs_4_0, VS() ) );
+        SetGeometryShader( NULL );
+        SetPixelShader( CompileShader( ps_4_0, noTexture() ) );
     }
 }

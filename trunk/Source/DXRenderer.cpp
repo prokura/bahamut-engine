@@ -20,18 +20,20 @@ static ID3D10Buffer*				dx_vertex_buffer		= NULL;
 static ID3D10InputLayout*			dx_vertex_layout		= NULL;
 
 //effects and techniques
-static ID3D10Effect*				dx_basic_effect			= NULL;
-static ID3D10EffectTechnique*		effect_technique		= NULL;
-static ID3D10EffectMatrixVariable*	effect_mat_view			= NULL;
-static ID3D10EffectMatrixVariable*	effect_mat_proj			= NULL;
-static ID3D10EffectMatrixVariable*	effect_mat_world		= NULL;
+static ID3D10Effect*						dx_basic_effect			= NULL;
+static ID3D10EffectTechnique*				effect_technique		= NULL;
+static ID3D10EffectMatrixVariable*			effect_mat_view			= NULL;
+static ID3D10EffectMatrixVariable*			effect_mat_proj			= NULL;
+static ID3D10EffectMatrixVariable*			effect_mat_world		= NULL;
+static ID3D10EffectShaderResourceVariable*	effect_texture			= NULL;
 
 struct vertex
 {
       D3DXVECTOR3 pos;
       D3DXVECTOR4 color;
+	  D3DXVECTOR2 texCoord;
 
-      vertex( D3DXVECTOR3 p, D3DXVECTOR4 c ) : pos(p), color(c) {}
+      vertex( D3DXVECTOR3 p, D3DXVECTOR4 c, D3DXVECTOR2 uv ) : pos(p), color(c), texCoord(uv) {}
 };
 
 bool Init_Device( int width, int height );
@@ -45,11 +47,7 @@ void Cleanup_Device();
 
 struct Bitmap
 {
-	unsigned width;
-	unsigned height;
-	int x;
-	int y;
-	unsigned* data;
+	ID3D10ShaderResourceView* texture;
 };
 
 static unsigned bitmap_next = 0;
@@ -77,31 +75,9 @@ BitmapId Create_Bitmap( const char* filename )
 	}
 
 	Bitmap* bitmap = &bitmaps[ handle ];
-
-	//unsigned int* image = (unsigned int*) stbi_load( filename, &w, &h, 0, 4 );
-
-	ID3D10Texture2D* image = NULL;
-	ID3D10Resource* ressource = NULL;
-
-	// Loads the texture into a temporary ID3D10Resource object
-	bool texture_load_fail = SUCCEEDED( D3DX10CreateTextureFromFile( dx_device,filename,NULL,NULL,&ressource,NULL) );
-
-	// Make sure the texture was loaded in successfully
-	assert( texture_load_fail );
-
-	// Translates the ID3D10Resource object into a ID3D10Texture2D object
-	ressource ->QueryInterface(__uuidof( ID3D10Texture2D), (LPVOID*)&image);
-	ressource ->Release();
-
-	int h = 200;
-	int w = 200;
-
-	bitmap->width = w;
-	bitmap->height = h;
-	bitmap->data = (unsigned*) malloc( sizeof( unsigned ) * w * h );
-	memcpy( bitmap->data, image, sizeof( unsigned ) * w * h );
-
-	image->Release();
+	 
+	HRESULT load_texture = D3DX10CreateShaderResourceViewFromFile( dx_device, filename, NULL, NULL, &bitmap->texture, NULL );
+	assert( SUCCEEDED( load_texture ) );
 
 	return handle;
 }
@@ -114,7 +90,7 @@ void Destroy_Bitmap( BitmapId bitmap )
 
 	bitmap_freelist[ bitmap_freelist_count ] = bitmap;
 	bitmap_freelist_count++;
-	free( bitmaps[ bitmap ].data );
+	bitmaps[ bitmap ].texture->Release();
 }
 
 //*** Clear All bitmaps ***
@@ -168,24 +144,24 @@ void Renderer_Draw()
 	static float r;
 	D3DXMATRIX w;
 	D3DXMatrixIdentity(&w);
-	D3DXMatrixRotationY(&w, r);
-	r += 0.001f;
 
 	//set effect matrices
 	effect_mat_world->SetMatrix( w );
 	effect_mat_view->SetMatrix( dx_view_matrix );
 	effect_mat_proj->SetMatrix( dx_projection_matrix );
+	effect_texture->SetResource( bitmaps[0].texture );
 
 	//fill vertex buffer with vertices
-	UINT numVertices = 3;
+	UINT numVertices = 4;
 	vertex* v = NULL;
 
 	//lock vertex buffer for CPU use
 	dx_vertex_buffer->Map(D3D10_MAP_WRITE_DISCARD, 0, (void**) &v );
 
-	v[0] = vertex( D3DXVECTOR3(-1,-1,0), D3DXVECTOR4(1,0,0,1) );
-	v[1] = vertex( D3DXVECTOR3(0,1,0), D3DXVECTOR4(0,1,0,1) );
-	v[2] = vertex( D3DXVECTOR3(1,-1,0), D3DXVECTOR4(0,0,1,1) );
+	v[0] = vertex( D3DXVECTOR3(-1,-1,0),D3DXVECTOR4(1,0,0,1),D3DXVECTOR2(0.0f, 1.0f) );
+	v[1] = vertex( D3DXVECTOR3(-1,1,0),D3DXVECTOR4(0,1,0,1),D3DXVECTOR2(0.0f, 0.0f) );
+	v[2] = vertex( D3DXVECTOR3(1,-1,0),D3DXVECTOR4(0,0,1,1),D3DXVECTOR2(1.0f, 1.0f) );
+	v[3] = vertex( D3DXVECTOR3(1,1,0),D3DXVECTOR4(1,1,0,1),D3DXVECTOR2(1.0f, 0.0f) );
 
 	dx_vertex_buffer->Unmap();
 
@@ -289,28 +265,31 @@ bool Init_Shader()
 		"fx_4_0",D3D10_SHADER_ENABLE_STRICTNESS,0,dx_device,NULL, NULL,&dx_basic_effect,NULL, NULL  ) ) )
 		return false;
 
-	effect_technique	= dx_basic_effect->GetTechniqueByName("Render");
+	effect_technique	= dx_basic_effect->GetTechniqueByName("full");
 
 	//create matrix effect pointers
 	effect_mat_view		= dx_basic_effect->GetVariableByName( "View" )->AsMatrix();
 	effect_mat_proj		= dx_basic_effect->GetVariableByName( "Projection" )->AsMatrix();
 	effect_mat_world	= dx_basic_effect->GetVariableByName( "World" )->AsMatrix();
+	effect_texture		= dx_basic_effect->GetVariableByName( "tex2D" )->AsShaderResource(); 
 
-	//tell directx how to handle vertex format we defined in the vcertex struct
+	//tell directx how to handle vertex format we defined in the vertex struct
 	D3D10_INPUT_ELEMENT_DESC layout[] =
 	{
-		{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT,0, 0, D3D10_INPUT_PER_VERTEX_DATA, 0 },
-		{ "COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT,0, 12, D3D10_INPUT_PER_VERTEX_DATA, 0 }
+		{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D10_INPUT_PER_VERTEX_DATA, 0 },
+		{ "COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 12, D3D10_INPUT_PER_VERTEX_DATA, 0 },
+		{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 28, D3D10_INPUT_PER_VERTEX_DATA, 0 }
 	};
 
-	UINT numElements = 2;
+	UINT numElements = sizeof( layout ) / sizeof( layout[0] );
+
+	//create input layout
 	D3D10_PASS_DESC PassDesc;
 	effect_technique->GetPassByIndex( 0 )->GetDesc( &PassDesc );
+	HRESULT create_effect_layout = dx_device->CreateInputLayout( layout, numElements, PassDesc.pIAInputSignature,PassDesc.IAInputSignatureSize, &dx_vertex_layout );
+	
+	assert( SUCCEEDED( create_effect_layout ) );
 
-	if ( FAILED( dx_device->CreateInputLayout( layout,numElements,PassDesc.pIAInputSignature,PassDesc.IAInputSignatureSize,&dx_vertex_layout) ) ) 
-		return false;
-
-	// Set the input layout
 	dx_device->IASetInputLayout( dx_vertex_layout );
 
 	return true;
