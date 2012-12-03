@@ -141,14 +141,12 @@ void Renderer_Draw()
 	dx_device->ClearRenderTargetView( dx_render_target, clear_color );
 
 	//create world matrix
-	static float r;
 	D3DXMATRIX w;
 	D3DXMatrixIdentity(&w);
+	D3DXMatrixTranslation(&w,100,0,0);
 
 	//set effect matrices
 	effect_mat_world->SetMatrix( w );
-	effect_mat_view->SetMatrix( dx_view_matrix );
-	effect_mat_proj->SetMatrix( dx_projection_matrix );
 	effect_texture->SetResource( bitmaps[0].texture );
 
 	//fill vertex buffer with vertices
@@ -158,14 +156,14 @@ void Renderer_Draw()
 	//lock vertex buffer for CPU use
 	dx_vertex_buffer->Map(D3D10_MAP_WRITE_DISCARD, 0, (void**) &v );
 
-	v[0] = vertex( D3DXVECTOR3(-1,-1,0),D3DXVECTOR4(1,0,0,1),D3DXVECTOR2(0.0f, 1.0f) );
-	v[1] = vertex( D3DXVECTOR3(-1,1,0),D3DXVECTOR4(0,1,0,1),D3DXVECTOR2(0.0f, 0.0f) );
-	v[2] = vertex( D3DXVECTOR3(1,-1,0),D3DXVECTOR4(0,0,1,1),D3DXVECTOR2(1.0f, 1.0f) );
-	v[3] = vertex( D3DXVECTOR3(1,1,0),D3DXVECTOR4(1,1,0,1),D3DXVECTOR2(1.0f, 0.0f) );
+	v[0] = vertex( D3DXVECTOR3(-100,-100,0),D3DXVECTOR4(100,0,0,100),D3DXVECTOR2(0.0f, 1.0f) );
+	v[1] = vertex( D3DXVECTOR3(-100,100,0),D3DXVECTOR4(0,100,0,100),D3DXVECTOR2(0.0f, 0.0f) );
+	v[2] = vertex( D3DXVECTOR3(100,-100,0),D3DXVECTOR4(0,0,100,100),D3DXVECTOR2(1.0f, 1.0f) );
+	v[3] = vertex( D3DXVECTOR3(100,100,0),D3DXVECTOR4(100,100,0,100),D3DXVECTOR2(1.0f, 0.0f) );
 
 	dx_vertex_buffer->Unmap();
 
-		// Set primitive topology 
+	// Set primitive topology 
 	dx_device->IASetPrimitiveTopology( D3D10_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP );
 
 	//get technique desc
@@ -251,8 +249,8 @@ bool Init_Device( int width, int height )
 	D3DXMatrixLookAtLH( &dx_view_matrix, &eye, &view, &up );
 
 	//Set up projection matrix
-	//D3DXMatrixOrthoLH(&dx_projection_matrix, width, height, 0.1f, 100.0f );
-	D3DXMatrixPerspectiveFovLH(&dx_projection_matrix, (float)D3DX_PI * 0.5f, (float)width/height, 0.1f, 100.0f);
+	D3DXMatrixOrthoLH(&dx_projection_matrix, (float)width, (float)height, 0.0f, 1.0f );
+	//D3DXMatrixPerspectiveFovLH(&dx_projection_matrix, (float)D3DX_PI * 0.5f, (float)width/height, 0.1f, 100.0f);
 
 	return true;
 }
@@ -292,6 +290,10 @@ bool Init_Shader()
 
 	dx_device->IASetInputLayout( dx_vertex_layout );
 
+	//Set up the shader matrix
+	effect_mat_view->SetMatrix( dx_view_matrix );
+	effect_mat_proj->SetMatrix( dx_projection_matrix );
+
 	return true;
 }
 
@@ -329,9 +331,9 @@ void Setup_Rasterization()
 	rasterizerState.DepthBias = false;
 	rasterizerState.DepthBiasClamp = 0;
 	rasterizerState.SlopeScaledDepthBias = 0;
-	rasterizerState.DepthClipEnable = true;
+	rasterizerState.DepthClipEnable = false;
 	rasterizerState.ScissorEnable = false;
-	rasterizerState.MultisampleEnable = false;
+	rasterizerState.MultisampleEnable = true;
 	rasterizerState.AntialiasedLineEnable = true;
 
 	dx_device->CreateRasterizerState( &rasterizerState, &dx_rasterizer_state );
