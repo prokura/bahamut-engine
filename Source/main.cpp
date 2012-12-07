@@ -3,15 +3,15 @@
 #include "renderer.h"
 #include "Bitmap.h"
 #include "WindowHandler.h"
-
+#include "config.h"
 
 //*** Game ***
 
 void Game()
 {
-    bool running = Renderer_Init( 800, 600, "Bahamuto" );
+    bool running = Renderer_Init( GAME_RESOLUTION_X, GAME_RESOLUTION_Y, "Bahamuto" );
 
-	Create_Bitmap( "Data\\Image\\blackdragon.png" );
+	Create_Bitmap( "Data\\Image\\baha.png" );
 	
     /*bitmap_handle_t bitmap = renderer_create_bitmap( "white.png" );
 	entity_t player = entity_create();
