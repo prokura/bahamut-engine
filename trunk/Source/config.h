@@ -12,6 +12,9 @@ const unsigned MAX_LOCOMOTION_COMPONENTS = 1024;
 const unsigned MAX_PLAYER_COMPONENTS = 4;
 
 //RENDERER
+const int GAME_RESOLUTION_X = 800;
+const int GAME_RESOLUTION_Y = 600;
+
 const unsigned MAX_RENDERER_SUBMITS = 4096;
 const unsigned MAX_BITMAPS = 256;
 const unsigned REFRESH_RATE = 60;

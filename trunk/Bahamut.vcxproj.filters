@@ -80,4 +80,9 @@
       <Filter>Source Files\Renderer</Filter>
     </ClInclude>
   </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="Data\Shader\texture.fx">
+      <Filter>Resource Files</Filter>
+    </CustomBuild>
+  </ItemGroup>
 </Project>

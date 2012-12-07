@@ -11,9 +11,7 @@ SamplerState linearSampler
     AddressV = Wrap;
 };
 
-matrix World;
-matrix View;
-matrix Projection;
+float4 transform;
 
 struct PS_INPUT
 {
@@ -34,15 +32,19 @@ struct VS_INPUT
 //--------------------------------------------------------------------------------------
 PS_INPUT VS( VS_INPUT input )
 {
-	PS_INPUT output;
+	PS_INPUT ps_input;
 	
-	output.Pos = mul( input.Pos, World );
-    output.Pos = mul( output.Pos, View );    
-    output.Pos = mul( output.Pos, Projection );
-	output.Color = input.Color;
-	output.Tex = input.Tex;
+	float4 p;
+	p.x = input.Pos.x * transform.z;
+	p.y = input.Pos.y * transform.w;
+	p.z = 0;
+	p.w = 1;
 	
-    return output;  
+	ps_input.Pos = p;
+	ps_input.Color = input.Color;
+	ps_input.Tex = input.Tex;
+	
+    return ps_input;  
 }
 
 //--------------------------------------------------------------------------------------
@@ -77,7 +79,7 @@ technique10 texturingDisabled
     pass P0
     {
         SetVertexShader( CompileShader( vs_4_0, VS() ) );
-        SetGeometryShader( NULL );
+		SetGeometryShader( NULL );
         SetPixelShader( CompileShader( ps_4_0, noTexture() ) );
     }
 }

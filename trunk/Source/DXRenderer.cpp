@@ -4,6 +4,8 @@
 #include <assert.h>
 #include "config.h"
 #include <d3dx10.h>
+#include "float3.h"
+#include "float4.h"
 
 ///*** DirectXValue ***
 static ID3D10Device*				dx_device				= NULL;
@@ -12,19 +14,16 @@ static ID3D10RenderTargetView*		dx_render_target		= NULL;
 static D3D10_VIEWPORT				dx_viewport;
 ID3D10RasterizerState*				dx_rasterizer_state		= NULL;
 
-static D3DXMATRIX					dx_view_matrix;
-static D3DXMATRIX					dx_projection_matrix;
 static float						clear_color[4]			={ 0,0,0,1 };
 
 static ID3D10Buffer*				dx_vertex_buffer		= NULL;
 static ID3D10InputLayout*			dx_vertex_layout		= NULL;
+static int							dx_vertex_count			= 0;
 
 //effects and techniques
 static ID3D10Effect*						dx_basic_effect			= NULL;
 static ID3D10EffectTechnique*				effect_technique		= NULL;
-static ID3D10EffectMatrixVariable*			effect_mat_view			= NULL;
-static ID3D10EffectMatrixVariable*			effect_mat_proj			= NULL;
-static ID3D10EffectMatrixVariable*			effect_mat_world		= NULL;
+static ID3D10EffectVectorVariable*			effect_transform		= NULL;
 static ID3D10EffectShaderResourceVariable*	effect_texture			= NULL;
 
 struct vertex
@@ -34,6 +33,11 @@ struct vertex
 	  D3DXVECTOR2 texCoord;
 
       vertex( D3DXVECTOR3 p, D3DXVECTOR4 c, D3DXVECTOR2 uv ) : pos(p), color(c), texCoord(uv) {}
+};
+
+struct InstanceType
+{
+	D3DXVECTOR3 position;
 };
 
 bool Init_Device( int width, int height );
@@ -47,6 +51,8 @@ void Cleanup_Device();
 
 struct Bitmap
 {
+	// x,y,scale,rotation
+	float transform[4];
 	ID3D10ShaderResourceView* texture;
 };
 
@@ -75,6 +81,10 @@ BitmapId Create_Bitmap( const char* filename )
 	}
 
 	Bitmap* bitmap = &bitmaps[ handle ];
+	bitmap->transform[0] = 0;
+	bitmap->transform[1] = 0;
+	bitmap->transform[2] = (float)(120.0f/(float)GAME_RESOLUTION_X);
+	bitmap->transform[3] = (float)(71.0f/(float)GAME_RESOLUTION_Y);
 	 
 	HRESULT load_texture = D3DX10CreateShaderResourceViewFromFile( dx_device, filename, NULL, NULL, &bitmap->texture, NULL );
 	assert( SUCCEEDED( load_texture ) );
@@ -109,19 +119,23 @@ bool Renderer_Init( unsigned width, unsigned height, const char* title )
 {
 	Window_Init( width, height, title, FULL_SCREEN );
 
-	if( !Init_Device(width,height) )
-    {
-        Cleanup_Device();
-        return false;
-    }
+	bool Initialisation = false;
 
-	if( !Init_Shader() ) return false;
+	Initialisation = Init_Device(width,height);
+        
+    assert( Initialisation );
 
-	if( !Init_Vertex_Buffer() ) return false;
+	Initialisation = Init_Shader();
+	
+	assert( Initialisation );
+
+	Initialisation = Init_Vertex_Buffer();
+
+	assert( Initialisation );
 
 	Setup_Rasterization();
 
-	return true;
+	return Initialisation;
 }
 
 //*** Terminate ***
@@ -140,28 +154,8 @@ void Renderer_Draw()
 	//clear scene
 	dx_device->ClearRenderTargetView( dx_render_target, clear_color );
 
-	//create world matrix
-	D3DXMATRIX w;
-	D3DXMatrixIdentity(&w);
-	D3DXMatrixTranslation(&w,100,0,0);
-
-	//set effect matrices
-	effect_mat_world->SetMatrix( w );
 	effect_texture->SetResource( bitmaps[0].texture );
-
-	//fill vertex buffer with vertices
-	UINT numVertices = 4;
-	vertex* v = NULL;
-
-	//lock vertex buffer for CPU use
-	dx_vertex_buffer->Map(D3D10_MAP_WRITE_DISCARD, 0, (void**) &v );
-
-	v[0] = vertex( D3DXVECTOR3(-100,-100,0),D3DXVECTOR4(100,0,0,100),D3DXVECTOR2(0.0f, 1.0f) );
-	v[1] = vertex( D3DXVECTOR3(-100,100,0),D3DXVECTOR4(0,100,0,100),D3DXVECTOR2(0.0f, 0.0f) );
-	v[2] = vertex( D3DXVECTOR3(100,-100,0),D3DXVECTOR4(0,0,100,100),D3DXVECTOR2(1.0f, 1.0f) );
-	v[3] = vertex( D3DXVECTOR3(100,100,0),D3DXVECTOR4(100,100,0,100),D3DXVECTOR2(1.0f, 0.0f) );
-
-	dx_vertex_buffer->Unmap();
+	effect_transform->SetFloatVector( bitmaps[0].transform );
 
 	// Set primitive topology 
 	dx_device->IASetPrimitiveTopology( D3D10_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP );
@@ -176,9 +170,8 @@ void Renderer_Draw()
 		effect_technique->GetPassByIndex( p )->Apply( 0 );
 				
 		//draw
-		dx_device->Draw( numVertices, 0 );
+		dx_device->Draw( dx_vertex_count, 0 );
 	}
-
 
 	//flip buffers
 	dx_swap_chain->Present(0,0);
@@ -242,14 +235,14 @@ bool Init_Device( int width, int height )
 	dx_device->RSSetViewports(1, &dx_viewport);
 
 	// Set up the view matrix
-	D3DXVECTOR3 eye(0.0f, 0.0f, -5.0f);
+	/*D3DXVECTOR3 eye(0.0f, 0.0f, -5.0f);
 	D3DXVECTOR3 view(0.0f, 0.0f, 1.0f);
 	D3DXVECTOR3 up(0.0f, 1.0f, 0.0f);
 
 	D3DXMatrixLookAtLH( &dx_view_matrix, &eye, &view, &up );
 
 	//Set up projection matrix
-	D3DXMatrixOrthoLH(&dx_projection_matrix, (float)width, (float)height, 0.0f, 1.0f );
+	D3DXMatrixOrthoLH(&dx_projection_matrix, (float)width, (float)height, 0.0f, 1.0f );*/
 	//D3DXMatrixPerspectiveFovLH(&dx_projection_matrix, (float)D3DX_PI * 0.5f, (float)width/height, 0.1f, 100.0f);
 
 	return true;
@@ -266,9 +259,7 @@ bool Init_Shader()
 	effect_technique	= dx_basic_effect->GetTechniqueByName("full");
 
 	//create matrix effect pointers
-	effect_mat_view		= dx_basic_effect->GetVariableByName( "View" )->AsMatrix();
-	effect_mat_proj		= dx_basic_effect->GetVariableByName( "Projection" )->AsMatrix();
-	effect_mat_world	= dx_basic_effect->GetVariableByName( "World" )->AsMatrix();
+	effect_transform	= dx_basic_effect->GetVariableByName( "transform" )->AsVector();
 	effect_texture		= dx_basic_effect->GetVariableByName( "tex2D" )->AsShaderResource(); 
 
 	//tell directx how to handle vertex format we defined in the vertex struct
@@ -290,10 +281,6 @@ bool Init_Shader()
 
 	dx_device->IASetInputLayout( dx_vertex_layout );
 
-	//Set up the shader matrix
-	effect_mat_view->SetMatrix( dx_view_matrix );
-	effect_mat_proj->SetMatrix( dx_projection_matrix );
-
 	return true;
 }
 
@@ -313,13 +300,29 @@ bool Init_Vertex_Buffer()
 	if ( FAILED( dx_device->CreateBuffer( &bd, NULL, &dx_vertex_buffer ) ) ) return false;
 
 	// Set vertex buffer
+
 	UINT stride = sizeof( vertex );
 	UINT offset = 0;
 	dx_device->IASetVertexBuffers( 0, 1, &dx_vertex_buffer, &stride, &offset );
 
+	//fill vertex buffer with vertices
+
+	vertex* v = NULL;
+	dx_vertex_count = 4;
+
+	//lock vertex buffer for CPU use
+	dx_vertex_buffer->Map( D3D10_MAP_WRITE_DISCARD, 0, (void**) &v );
+
+	v[0] = vertex( D3DXVECTOR3(-1,-1,0),D3DXVECTOR4(1,0,0,1),D3DXVECTOR2(0.0f, 1.0f) );
+	v[1] = vertex( D3DXVECTOR3(-1,1,0),D3DXVECTOR4(0,1,0,1),D3DXVECTOR2(0.0f, 0.0f) );
+	v[2] = vertex( D3DXVECTOR3(1,-1,0),D3DXVECTOR4(0,0,1,1),D3DXVECTOR2(1.0f, 1.0f) );
+	v[3] = vertex( D3DXVECTOR3(1,1,0),D3DXVECTOR4(1,1,0,1),D3DXVECTOR2(1.0f, 0.0f) );
+
+	dx_vertex_buffer->Unmap();
+
 	return true;
 }
-
+ 
 //*** Set Up Rasterization ***
 
 void Setup_Rasterization()
