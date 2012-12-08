@@ -4,8 +4,6 @@
 #include <assert.h>
 #include "config.h"
 #include <d3dx10.h>
-#include "float3.h"
-#include "float4.h"
 
 ///*** DirectXValue ***
 static ID3D10Device*				dx_device				= NULL;
@@ -14,16 +12,20 @@ static ID3D10RenderTargetView*		dx_render_target		= NULL;
 static D3D10_VIEWPORT				dx_viewport;
 ID3D10RasterizerState*				dx_rasterizer_state		= NULL;
 
-static float						clear_color[4]			={ 0,0,0,1 };
+static float						clear_color[4]			={ 0.93f,0.95f,0.98f,1 };
 
 static ID3D10Buffer*				dx_vertex_buffer		= NULL;
 static ID3D10InputLayout*			dx_vertex_layout		= NULL;
 static int							dx_vertex_count			= 0;
 
+//renderstate
+static ID3D10BlendState*			dx_AlphaBlendState		= NULL;
+
 //effects and techniques
 static ID3D10Effect*						dx_basic_effect			= NULL;
 static ID3D10EffectTechnique*				effect_technique		= NULL;
-static ID3D10EffectVectorVariable*			effect_transform		= NULL;
+static ID3D10EffectVariable*				effect_transform		= NULL;
+static ID3D10EffectVectorVariable*			effect_resolution		= NULL;
 static ID3D10EffectShaderResourceVariable*	effect_texture			= NULL;
 
 struct vertex
@@ -35,12 +37,8 @@ struct vertex
       vertex( D3DXVECTOR3 p, D3DXVECTOR4 c, D3DXVECTOR2 uv ) : pos(p), color(c), texCoord(uv) {}
 };
 
-struct InstanceType
-{
-	D3DXVECTOR3 position;
-};
 
-bool Init_Device( int width, int height );
+bool Init_Device( int width );
 bool Init_Shader();
 bool Init_Vertex_Buffer();
 void Setup_Rasterization();
@@ -49,10 +47,17 @@ void Cleanup_Device();
 
 //*** Texture Interface ***
 
+struct Transform
+{
+	float position[2];
+	float scale[2];
+	float rotation;
+};
+
 struct Bitmap
 {
 	// x,y,scale,rotation
-	float transform[4];
+	Transform transform;
 	ID3D10ShaderResourceView* texture;
 };
 
@@ -81,13 +86,22 @@ BitmapId Create_Bitmap( const char* filename )
 	}
 
 	Bitmap* bitmap = &bitmaps[ handle ];
-	bitmap->transform[0] = 0;
-	bitmap->transform[1] = 0;
-	bitmap->transform[2] = (float)(120.0f/(float)GAME_RESOLUTION_X);
-	bitmap->transform[3] = (float)(71.0f/(float)GAME_RESOLUTION_Y);
 	 
 	HRESULT load_texture = D3DX10CreateShaderResourceViewFromFile( dx_device, filename, NULL, NULL, &bitmap->texture, NULL );
 	assert( SUCCEEDED( load_texture ) );
+
+	ID3D10Resource* res;
+	bitmap->texture->GetResource( &res ); 
+	D3D10_TEXTURE2D_DESC desc2D;
+    ((ID3D10Texture2D*)res)->GetDesc(&desc2D);
+
+	bitmap->transform.position[0] = 0;
+	bitmap->transform.position[1] = 0;
+	bitmap->transform.scale[0] = (float)(desc2D.Width/(float)GAME_RESOLUTION_X);
+	bitmap->transform.scale[1] = (float)(desc2D.Width/(float)GAME_RESOLUTION_Y);
+	bitmap->transform.rotation = 180;
+
+	res->Release();
 
 	return handle;
 }
@@ -121,7 +135,7 @@ bool Renderer_Init( unsigned width, unsigned height, const char* title )
 
 	bool Initialisation = false;
 
-	Initialisation = Init_Device(width,height);
+	Initialisation = Init_Device( width );
         
     assert( Initialisation );
 
@@ -155,7 +169,7 @@ void Renderer_Draw()
 	dx_device->ClearRenderTargetView( dx_render_target, clear_color );
 
 	effect_texture->SetResource( bitmaps[0].texture );
-	effect_transform->SetFloatVector( bitmaps[0].transform );
+	effect_transform->SetRawValue( &bitmaps[0].transform,0,36 );
 
 	// Set primitive topology 
 	dx_device->IASetPrimitiveTopology( D3D10_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP );
@@ -180,7 +194,7 @@ void Renderer_Draw()
 
 //*** Init Directx Device ***
 
-bool Init_Device( int width, int height )
+bool Init_Device( int width)
 {
 	//Set up DX swap chain
 	DXGI_SWAP_CHAIN_DESC swapChainDesc;
@@ -188,8 +202,8 @@ bool Init_Device( int width, int height )
 
 	//set buffer dimensions and format
 	swapChainDesc.BufferCount = 2;
-	swapChainDesc.BufferDesc.Width = width;
-	swapChainDesc.BufferDesc.Height = height;
+	swapChainDesc.BufferDesc.Width = GAME_RESOLUTION_X;
+	swapChainDesc.BufferDesc.Height = GAME_RESOLUTION_Y;
 	swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
 	swapChainDesc.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;;
 
@@ -203,7 +217,7 @@ bool Init_Device( int width, int height )
 
 	//output window handle
 	swapChainDesc.OutputWindow = Window_GetHWND();
-	swapChainDesc.Windowed = true;
+	swapChainDesc.Windowed = !FULL_SCREEN;
 
 	//Create the D3D device
 	if ( FAILED( D3D10CreateDeviceAndSwapChain(	NULL,D3D10_DRIVER_TYPE_HARDWARE,NULL,0,D3D10_SDK_VERSION,&swapChainDesc,&dx_swap_chain,&dx_device) ) )
@@ -224,8 +238,8 @@ bool Init_Device( int width, int height )
 	dx_device->OMSetRenderTargets(1, &dx_render_target, NULL);
 
 	//create viewport structure
-	dx_viewport.Width = width;
-	dx_viewport.Height = height;
+	dx_viewport.Width = GAME_RESOLUTION_X;
+	dx_viewport.Height = GAME_RESOLUTION_Y;
 	dx_viewport.MinDepth = 0.0f;
 	dx_viewport.MaxDepth = 1.0f;
 	dx_viewport.TopLeftX = 0;
@@ -234,16 +248,23 @@ bool Init_Device( int width, int height )
 	//set the viewport
 	dx_device->RSSetViewports(1, &dx_viewport);
 
-	// Set up the view matrix
-	/*D3DXVECTOR3 eye(0.0f, 0.0f, -5.0f);
-	D3DXVECTOR3 view(0.0f, 0.0f, 1.0f);
-	D3DXVECTOR3 up(0.0f, 1.0f, 0.0f);
+	//setup blend state
+	D3D10_BLEND_DESC BlendState;
+	ZeroMemory(&BlendState, sizeof(D3D10_BLEND_DESC));
 
-	D3DXMatrixLookAtLH( &dx_view_matrix, &eye, &view, &up );
+	BlendState.BlendEnable[0] = TRUE;
+	BlendState.SrcBlend = D3D10_BLEND_SRC_ALPHA;
+	BlendState.DestBlend = D3D10_BLEND_INV_SRC_ALPHA;
+	BlendState.BlendOp = D3D10_BLEND_OP_ADD;
+	BlendState.SrcBlendAlpha = D3D10_BLEND_ZERO;
+	BlendState.DestBlendAlpha = D3D10_BLEND_ZERO;
+	BlendState.BlendOpAlpha = D3D10_BLEND_OP_ADD;
+	BlendState.RenderTargetWriteMask[0] = D3D10_COLOR_WRITE_ENABLE_ALL;
 
-	//Set up projection matrix
-	D3DXMatrixOrthoLH(&dx_projection_matrix, (float)width, (float)height, 0.0f, 1.0f );*/
-	//D3DXMatrixPerspectiveFovLH(&dx_projection_matrix, (float)D3DX_PI * 0.5f, (float)width/height, 0.1f, 100.0f);
+	dx_device->CreateBlendState(&BlendState, &dx_AlphaBlendState);
+
+	//set blend state
+	dx_device->OMSetBlendState(dx_AlphaBlendState, 0, 0xfffffff);
 
 	return true;
 }
@@ -259,7 +280,8 @@ bool Init_Shader()
 	effect_technique	= dx_basic_effect->GetTechniqueByName("full");
 
 	//create matrix effect pointers
-	effect_transform	= dx_basic_effect->GetVariableByName( "transform" )->AsVector();
+	effect_resolution	= dx_basic_effect->GetVariableByName( "resolution" )->AsVector();
+	effect_transform	= dx_basic_effect->GetVariableByName( "t" );
 	effect_texture		= dx_basic_effect->GetVariableByName( "tex2D" )->AsShaderResource(); 
 
 	//tell directx how to handle vertex format we defined in the vertex struct
@@ -277,6 +299,11 @@ bool Init_Shader()
 	effect_technique->GetPassByIndex( 0 )->GetDesc( &PassDesc );
 	HRESULT create_effect_layout = dx_device->CreateInputLayout( layout, numElements, PassDesc.pIAInputSignature,PassDesc.IAInputSignatureSize, &dx_vertex_layout );
 	
+	float resolution[2];
+	resolution[0] = GAME_RESOLUTION_X;
+	resolution[1] = GAME_RESOLUTION_Y;
+	effect_resolution->SetFloatVector( resolution );
+
 	assert( SUCCEEDED( create_effect_layout ) );
 
 	dx_device->IASetInputLayout( dx_vertex_layout );
@@ -354,6 +381,7 @@ void Cleanup_Device()
 	if ( dx_vertex_layout ) dx_vertex_layout->Release();
 	if ( dx_rasterizer_state ) dx_rasterizer_state->Release();
 	if ( dx_basic_effect ) dx_basic_effect->Release();
+	if( dx_AlphaBlendState ) dx_AlphaBlendState->Release();
 }
 
 
