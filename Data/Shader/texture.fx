@@ -11,13 +11,22 @@ SamplerState linearSampler
     AddressV = Wrap;
 };
 
-float4 transform;
+uniform float2 resolution;
+
+struct Transform
+{
+	float2 position;
+	float2 scale;
+	float angle;
+};
+
+Transform t;
 
 struct PS_INPUT
 {
 	float4 Pos : SV_POSITION;
     float4 Color : COLOR;
-    float2 Tex : TEXCOORD;
+    float2 Tex : TEXCOORD_centroid;
 };
 
 struct VS_INPUT
@@ -35,11 +44,14 @@ PS_INPUT VS( VS_INPUT input )
 	PS_INPUT ps_input;
 	
 	float4 p;
-	p.x = input.Pos.x * transform.z;
-	p.y = input.Pos.y * transform.w;
+	p.x = (input.Pos.x * t.scale.x ) + t.position.x;
+	p.y = (input.Pos.y * t.scale.y ) + t.position.y;
 	p.z = 0;
 	p.w = 1;
-	
+
+	p.x += 0.5/resolution.x;
+	p.y += 0.5/resolution.y;
+
 	ps_input.Pos = p;
 	ps_input.Color = input.Color;
 	ps_input.Tex = input.Tex;

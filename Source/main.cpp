@@ -9,9 +9,9 @@
 
 void Game()
 {
-    bool running = Renderer_Init( GAME_RESOLUTION_X, GAME_RESOLUTION_Y, "Bahamuto" );
+    bool running = Renderer_Init( 800, 600, "Bahamuto" );
 
-	Create_Bitmap( "Data\\Image\\baha.png" );
+	Create_Bitmap( "Data\\Image\\FrogStand.png" );
 	
     /*bitmap_handle_t bitmap = renderer_create_bitmap( "white.png" );
 	entity_t player = entity_create();
