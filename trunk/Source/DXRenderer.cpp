@@ -30,11 +30,11 @@ static ID3D10EffectShaderResourceVariable*	effect_texture			= NULL;
 
 struct vertex
 {
-      D3DXVECTOR3 pos;
+      D3DXVECTOR2 pos;
       D3DXVECTOR4 color;
 	  D3DXVECTOR2 texCoord;
 
-      vertex( D3DXVECTOR3 p, D3DXVECTOR4 c, D3DXVECTOR2 uv ) : pos(p), color(c), texCoord(uv) {}
+      vertex( D3DXVECTOR2 p, D3DXVECTOR4 c, D3DXVECTOR2 uv ) : pos(p), color(c), texCoord(uv) {}
 };
 
 
@@ -98,7 +98,7 @@ BitmapId Create_Bitmap( const char* filename )
 	bitmap->transform.position[0] = 0;
 	bitmap->transform.position[1] = 0;
 	bitmap->transform.scale[0] = (float)(desc2D.Width/(float)GAME_RESOLUTION_X);
-	bitmap->transform.scale[1] = (float)(desc2D.Width/(float)GAME_RESOLUTION_Y);
+	bitmap->transform.scale[1] = (float)(desc2D.Height/(float)GAME_RESOLUTION_Y);
 	bitmap->transform.rotation = 180;
 
 	res->Release();
@@ -178,14 +178,11 @@ void Renderer_Draw()
 	D3D10_TECHNIQUE_DESC techDesc;
 	effect_technique->GetDesc( &techDesc );
 	
-	for( UINT p = 0; p < techDesc.Passes; ++p )
-	{
-		//apply technique
-		effect_technique->GetPassByIndex( p )->Apply( 0 );
-				
-		//draw
-		dx_device->Draw( dx_vertex_count, 0 );
-	}
+	//Apply technique
+	effect_technique->GetPassByIndex( 0 )->Apply( 0 );
+
+	//Draw
+	dx_device->Draw( dx_vertex_count, 0 );
 
 	//flip buffers
 	dx_swap_chain->Present(0,0);
@@ -253,12 +250,15 @@ bool Init_Device( int width)
 	ZeroMemory(&BlendState, sizeof(D3D10_BLEND_DESC));
 
 	BlendState.BlendEnable[0] = TRUE;
+
 	BlendState.SrcBlend = D3D10_BLEND_SRC_ALPHA;
 	BlendState.DestBlend = D3D10_BLEND_INV_SRC_ALPHA;
 	BlendState.BlendOp = D3D10_BLEND_OP_ADD;
-	BlendState.SrcBlendAlpha = D3D10_BLEND_ZERO;
-	BlendState.DestBlendAlpha = D3D10_BLEND_ZERO;
+
+	BlendState.SrcBlendAlpha = D3D10_BLEND_ONE;
+	BlendState.DestBlendAlpha = D3D10_BLEND_ONE;
 	BlendState.BlendOpAlpha = D3D10_BLEND_OP_ADD;
+
 	BlendState.RenderTargetWriteMask[0] = D3D10_COLOR_WRITE_ENABLE_ALL;
 
 	dx_device->CreateBlendState(&BlendState, &dx_AlphaBlendState);
@@ -287,9 +287,9 @@ bool Init_Shader()
 	//tell directx how to handle vertex format we defined in the vertex struct
 	D3D10_INPUT_ELEMENT_DESC layout[] =
 	{
-		{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D10_INPUT_PER_VERTEX_DATA, 0 },
-		{ "COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 12, D3D10_INPUT_PER_VERTEX_DATA, 0 },
-		{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 28, D3D10_INPUT_PER_VERTEX_DATA, 0 }
+		{ "POSITION", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 0, D3D10_INPUT_PER_VERTEX_DATA, 0 },
+		{ "COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 8, D3D10_INPUT_PER_VERTEX_DATA, 0 },
+		{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 24, D3D10_INPUT_PER_VERTEX_DATA, 0 }
 	};
 
 	UINT numElements = sizeof( layout ) / sizeof( layout[0] );
@@ -340,10 +340,10 @@ bool Init_Vertex_Buffer()
 	//lock vertex buffer for CPU use
 	dx_vertex_buffer->Map( D3D10_MAP_WRITE_DISCARD, 0, (void**) &v );
 
-	v[0] = vertex( D3DXVECTOR3(-1,-1,0),D3DXVECTOR4(1,0,0,1),D3DXVECTOR2(0.0f, 1.0f) );
-	v[1] = vertex( D3DXVECTOR3(-1,1,0),D3DXVECTOR4(0,1,0,1),D3DXVECTOR2(0.0f, 0.0f) );
-	v[2] = vertex( D3DXVECTOR3(1,-1,0),D3DXVECTOR4(0,0,1,1),D3DXVECTOR2(1.0f, 1.0f) );
-	v[3] = vertex( D3DXVECTOR3(1,1,0),D3DXVECTOR4(1,1,0,1),D3DXVECTOR2(1.0f, 0.0f) );
+	v[0] = vertex( D3DXVECTOR2(-1,-1),D3DXVECTOR4(1,0,0,1),D3DXVECTOR2(0.0f, 1.0f) );
+	v[1] = vertex( D3DXVECTOR2(-1,1),D3DXVECTOR4(0,1,0,1),D3DXVECTOR2(0.0f, 0.0f) );
+	v[2] = vertex( D3DXVECTOR2(1,-1),D3DXVECTOR4(0,0,1,1),D3DXVECTOR2(1.0f, 1.0f) );
+	v[3] = vertex( D3DXVECTOR2(1,1),D3DXVECTOR4(1,1,0,1),D3DXVECTOR2(1.0f, 0.0f) );
 
 	dx_vertex_buffer->Unmap();
 
