@@ -1,7 +1,7 @@
 /*** main.cpp ***/
 
 #include "renderer.h"
-#include "Bitmap.h"
+#include "Texture.h"
 #include "WindowHandler.h"
 #include "config.h"
 
@@ -11,7 +11,7 @@ void Game()
 {
     bool running = Renderer_Init( 800, 600, "Bahamuto" );
 
-	Create_Bitmap( "Data\\Image\\FrogStand.png" );
+	Create_Texture( "Data\\Image\\bahaAlpha.png" );
 	
     /*bitmap_handle_t bitmap = renderer_create_bitmap( "white.png" );
 	entity_t player = entity_create();
