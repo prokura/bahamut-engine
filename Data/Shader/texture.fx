@@ -6,7 +6,7 @@
 Texture2D tex2D;
 SamplerState linearSampler
 {
-    Filter = MIN_MAG_MIP_LINEAR;
+    Filter = MIN_MAG_MIP_POINT;
     AddressU = Wrap;
     AddressV = Wrap;
 };
@@ -31,7 +31,7 @@ struct PS_INPUT
 
 struct VS_INPUT
 {
-	float4 Pos : POSITION;
+	float2 Pos : POSITION;
     float4 Color : COLOR;
     float2 Tex : TEXCOORD;
 };
