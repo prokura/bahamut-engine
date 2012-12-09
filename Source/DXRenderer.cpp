@@ -1,5 +1,5 @@
 #include "Renderer.h"
-#include "Bitmap.h"
+#include "Texture.h"
 #include "WindowHandler.h"
 #include <assert.h>
 #include "config.h"
@@ -37,13 +37,11 @@ struct vertex
       vertex( D3DXVECTOR2 p, D3DXVECTOR4 c, D3DXVECTOR2 uv ) : pos(p), color(c), texCoord(uv) {}
 };
 
-
 bool Init_Device( int width );
 bool Init_Shader();
 bool Init_Vertex_Buffer();
 void Setup_Rasterization();
 void Cleanup_Device();
-
 
 //*** Texture Interface ***
 
@@ -54,76 +52,76 @@ struct Transform
 	float rotation;
 };
 
-struct Bitmap
+struct Texture
 {
 	// x,y,scale,rotation
 	Transform transform;
 	ID3D10ShaderResourceView* texture;
 };
 
-static unsigned bitmap_next = 0;
-static unsigned bitmap_freelist[ MAX_BITMAPS ];
-static unsigned bitmap_freelist_count = 0;
-static Bitmap bitmaps[ MAX_BITMAPS ];
+static unsigned Texture_next = 0;
+static unsigned Texture_freelist[ MAX_TEXTURES ];
+static unsigned Texture_freelist_count = 0;
+static Texture Textures[ MAX_TEXTURES ];
 
-//*** Create bitmaps ***
+//*** Create Textures ***
 
-BitmapId Create_Bitmap( const char* filename )
+TextureId Create_Texture( const char* filename )
 {
 	unsigned handle = 0;
 
 	// Create from the free list if we can
-	if( bitmap_freelist_count > 0 )
+	if( Texture_freelist_count > 0 )
 	{
-		handle = bitmap_freelist[ bitmap_freelist_count - 1 ];
-		bitmap_freelist_count--;
+		handle = Texture_freelist[ Texture_freelist_count - 1 ];
+		Texture_freelist_count--;
 	}
 	else // And only expand the range if free list is empty
 	{
-		assert( bitmap_next < MAX_BITMAPS);
-		handle = bitmap_next;
-		bitmap_next++;
+		assert( Texture_next < MAX_TEXTURES );
+		handle = Texture_next;
+		Texture_next++;
 	}
 
-	Bitmap* bitmap = &bitmaps[ handle ];
+	Texture* Texture = &Textures[ handle ];
 	 
-	HRESULT load_texture = D3DX10CreateShaderResourceViewFromFile( dx_device, filename, NULL, NULL, &bitmap->texture, NULL );
+	HRESULT load_texture = D3DX10CreateShaderResourceViewFromFile( dx_device, filename, NULL, NULL, &Texture->texture, NULL );
 	assert( SUCCEEDED( load_texture ) );
 
 	ID3D10Resource* res;
-	bitmap->texture->GetResource( &res ); 
+	Texture->texture->GetResource( &res ); 
 	D3D10_TEXTURE2D_DESC desc2D;
     ((ID3D10Texture2D*)res)->GetDesc(&desc2D);
 
-	bitmap->transform.position[0] = 0;
-	bitmap->transform.position[1] = 0;
-	bitmap->transform.scale[0] = (float)(desc2D.Width/(float)GAME_RESOLUTION_X);
-	bitmap->transform.scale[1] = (float)(desc2D.Height/(float)GAME_RESOLUTION_Y);
-	bitmap->transform.rotation = 180;
+	Texture->transform.position[0] = 0;
+	Texture->transform.position[1] = 0;
+	Texture->transform.scale[0] = (float)(desc2D.Width/(float)GAME_RESOLUTION_X);
+	Texture->transform.scale[1] = (float)(desc2D.Height/(float)GAME_RESOLUTION_Y);
+	Texture->transform.rotation = 180;
 
 	res->Release();
 
 	return handle;
 }
 
-//*** Destroy bitmaps ***
+//*** Destroy Textures ***
 
-void Destroy_Bitmap( BitmapId bitmap )
+void Destroy_Texture( TextureId Texture )
 {
-	assert( bitmap < MAX_BITMAPS );
+	assert( Texture < MAX_TEXTURES );
 
-	bitmap_freelist[ bitmap_freelist_count ] = bitmap;
-	bitmap_freelist_count++;
-	bitmaps[ bitmap ].texture->Release();
+	Texture_freelist[ Texture_freelist_count ] = Texture;
+	Texture_freelist_count++;
+	Textures[ Texture ].texture->Release();
 }
 
-//*** Clear All bitmaps ***
+//*** Clear All Textures ***
 
-void Clear_All_Bitmap()
+void Clear_All_Texture()
 {
-	for( unsigned nBitmap = 0 ; nBitmap < bitmap_next; nBitmap++ )
+	for( unsigned nTexture = 0 ; nTexture < Texture_next; nTexture++ )
 	{
-		Destroy_Bitmap( nBitmap );
+		Destroy_Texture( nTexture );
 	}
 }
 
@@ -156,7 +154,7 @@ bool Renderer_Init( unsigned width, unsigned height, const char* title )
 
 void Renderer_Terminate()
 {
-	Clear_All_Bitmap();
+	Clear_All_Texture();
 	Cleanup_Device();
 	Window_Destroy();
 }
@@ -168,8 +166,8 @@ void Renderer_Draw()
 	//clear scene
 	dx_device->ClearRenderTargetView( dx_render_target, clear_color );
 
-	effect_texture->SetResource( bitmaps[0].texture );
-	effect_transform->SetRawValue( &bitmaps[0].transform,0,36 );
+	effect_texture->SetResource( Textures[0].texture );
+	effect_transform->SetRawValue( &Textures[0].transform,0,36 );
 
 	// Set primitive topology 
 	dx_device->IASetPrimitiveTopology( D3D10_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP );
@@ -191,11 +189,11 @@ void Renderer_Draw()
 
 //*** Init Directx Device ***
 
-bool Init_Device( int width)
+bool Init_Device( int width )
 {
 	//Set up DX swap chain
 	DXGI_SWAP_CHAIN_DESC swapChainDesc;
-	ZeroMemory(&swapChainDesc, sizeof(swapChainDesc));
+	ZeroMemory( &swapChainDesc, sizeof(swapChainDesc) );
 
 	//set buffer dimensions and format
 	swapChainDesc.BufferCount = 2;
@@ -327,7 +325,6 @@ bool Init_Vertex_Buffer()
 	if ( FAILED( dx_device->CreateBuffer( &bd, NULL, &dx_vertex_buffer ) ) ) return false;
 
 	// Set vertex buffer
-
 	UINT stride = sizeof( vertex );
 	UINT offset = 0;
 	dx_device->IASetVertexBuffers( 0, 1, &dx_vertex_buffer, &stride, &offset );
