@@ -12,12 +12,11 @@ const unsigned MAX_SPRITE_COMPONENTS = 1024;
 const int GAME_RESOLUTION_X = 800;
 const int GAME_RESOLUTION_Y = 600;
 
-const unsigned MAX_RENDERER_SUBMITS = 4096;
-const unsigned MAX_TEXTURES = 256;
 const unsigned REFRESH_RATE = 60;
 const bool VSYNC_ENABLED = true;
 const bool FULL_SCREEN = false;
 const bool MULTI_SAMPLING = true;
-const int VERTEX_BUFFER_SIZE = 2048;
+const int VERTEX_BUFFER_SIZE = 4096;
+const unsigned MAX_TEXTURES = 256;
 
 #endif /* config_h */
