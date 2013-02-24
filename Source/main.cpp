@@ -23,7 +23,7 @@ void Game()
 
 	while( running  && !Window_GetMessage() )
 	{
-		float delta_time = 1.0f/60.0f;
+		/*float delta_time = 1.0f/60.0f;*/
 		// Run systems
 		Renderer_Draw();		
 	}
@@ -38,7 +38,7 @@ void Game()
 
 /*** WinMain ***/
 
-int CALLBACK WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow )
+int CALLBACK WinMain( HINSTANCE /*hInstance*/, HINSTANCE /*hPrevInstance*/, LPSTR /*lpCmdLine*/, int /*nCmdShow*/ )
 {
 	#ifndef NDEBUG
 		int flag = _CrtSetDbgFlag( _CRTDBG_REPORT_FLAG ); /* Get current flag */
@@ -46,7 +46,7 @@ int CALLBACK WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdL
 		_CrtSetDbgFlag( flag ); /* Set flag to the new value */
 	#endif
 
-    Game();	
+    Game();
 
 	return 0;
 }

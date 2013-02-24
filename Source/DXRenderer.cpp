@@ -189,7 +189,7 @@ void Renderer_Draw()
 
 //*** Init Directx Device ***
 
-bool Init_Device( int width )
+bool Init_Device( int /*width*/ )
 {
 	//Set up DX swap chain
 	DXGI_SWAP_CHAIN_DESC swapChainDesc;
