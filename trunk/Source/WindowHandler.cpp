@@ -11,7 +11,25 @@ static std::string window_title;
 
 static LRESULT CALLBACK WndProc(HWND hwnd, UINT umessage, WPARAM wparam, LPARAM lparam)
 {
-	return DefWindowProc(hwnd, umessage, wparam, lparam);
+	switch(umessage) 
+	{
+		case WM_CLOSE: 
+		{
+			DestroyWindow(hwnd); // this
+			break;
+		}
+
+		case WM_DESTROY: 
+		{
+			PostQuitMessage(0);
+		}
+		break;
+
+		default:
+			return DefWindowProc(hwnd, umessage, wparam, lparam);
+	}
+
+	return 0;
 }
 
 //*** Window Init ***
@@ -71,7 +89,7 @@ void Window_Init( int width, int height, const char* title, bool fullscreen )
 
 	// Create the window with the screen settings and get the handle to it.
 		hwnd = CreateWindowEx(WS_EX_APPWINDOW, title, title, 
-								WS_CLIPSIBLINGS | WS_CLIPCHILDREN | WS_POPUP,
+								WS_CLIPSIBLINGS | WS_CLIPCHILDREN | WS_SYSMENU,
 								posX, posY, width, height, NULL, NULL, hinstance, NULL);
 
 	// Bring the window up on the screen and set it as main focus.
@@ -105,7 +123,7 @@ void Window_Destroy()
 
 bool Window_GetMessage()
 {
-	MSG msg = {0};
+	MSG msg;
 
 	while( PeekMessage(&msg, NULL, 0, 0, PM_REMOVE) == TRUE )
 	{
@@ -113,7 +131,7 @@ bool Window_GetMessage()
 		DispatchMessage( &msg );
 	}
 
-	return ( msg.message == WM_QUIT );
+	return ( msg.message == WM_CLOSE || msg.message == WM_QUIT || msg.message == WM_DESTROY );
 }
 
 //*** Window GetHWND ***

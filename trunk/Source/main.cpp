@@ -2,8 +2,10 @@
 
 #include "renderer.h"
 #include "Texture.h"
+#include "Shader.h"
 #include "WindowHandler.h"
 #include "config.h"
+#include "Entity.h"
 
 //*** Game ***
 
@@ -11,15 +13,8 @@ void Game()
 {
     bool running = Renderer_Init( 800, 600, "Bahamuto" );
 
-	Create_Texture( "Data\\Image\\bahaAlpha.png" );
-	
-    /*bitmap_handle_t bitmap = renderer_create_bitmap( "white.png" );
-	entity_t player = entity_create();
-	component_player_create( player, 0 );
-	component_locomotion_create( player, float3( 320, 0, 240 ) );
-	component_sprite_create( player, bitmap );
-	*/
-
+	Texture_Create( "Data\\Image\\bahaAlpha.png" );
+	Shader_Create("Data\\Shader\\texture.fx");
 
 	while( running  && !Window_GetMessage() )
 	{
@@ -29,6 +24,10 @@ void Game()
 	}
 		
 	Renderer_Terminate();
+
+	float* a = new float;
+
+	*a = 5.0f;
 }
 
 

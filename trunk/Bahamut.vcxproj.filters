@@ -30,6 +30,15 @@
     <Filter Include="Source Files\WindowHandler\Windows">
       <UniqueIdentifier>{02d82038-0714-4d10-baa2-4193de802ff6}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\Renderer\OpenGl">
+      <UniqueIdentifier>{16a5d28f-3b53-4ff0-b8e4-59ebfa4cd17f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\WindowHandler\Linux">
+      <UniqueIdentifier>{6e67944d-1956-416a-a700-fe77d3114ad6}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\WindowHandler\MacOs">
+      <UniqueIdentifier>{d1c69954-6374-47cb-9cce-75503c8d8516}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\float2.cpp">
@@ -76,7 +85,10 @@
     <ClInclude Include="source\config.h">
       <Filter>Source Files</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Bitmap.h">
+    <ClInclude Include="Source\Texture.h">
+      <Filter>Source Files\Renderer</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Shader.h">
       <Filter>Source Files\Renderer</Filter>
     </ClInclude>
   </ItemGroup>

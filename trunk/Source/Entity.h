@@ -1,9 +1,17 @@
 #ifndef Entity_h
 #define Entity_h
 
-typedef unsigned Entity;
+#include "float2.h"
 
-Entity Entity_Create();
-void Entity_Destroy( Entity entity );
+typedef unsigned EntityID;
+
+struct Entity
+{
+	float2 Position;
+};
+
+EntityID Entity_Create();
+void Entity_Destroy( EntityID entity );
+Entity* Entity_Get( EntityID ID );
 
 #endif /* Entity_h */

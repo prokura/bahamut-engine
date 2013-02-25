@@ -1,53 +1,59 @@
 //*** Entity.cpp ***
 
+#include "Entity.h"
 #include "config.h"
 #include <assert.h>
 
-typedef unsigned Entity;
-
-typedef void (*Component_Destroy_Callback)( Entity entity );
-
 //*** Globals ***
 
-static unsigned entity_next = 0;
+static unsigned Entity_Count = 0;
+static EntityID Entity_Freelist[ MAX_ENTITIES ];
+static unsigned Entity_Freelist_Count = 0;
+static Entity Entities[ MAX_ENTITIES ];
 
-static Entity entity_freelist[ MAX_ENTITIES ];
-static unsigned entity_freelist_count = 0;
-
-//USE 2bits of the u32 to implement a ref counter
 
 //*** Create ***
 
-Entity entity_create()
+EntityID Entity_Create()
 {
 	// Create from the free list if we can
-	if( entity_freelist_count > 0 )
+	if( Entity_Freelist_Count > 0 )
 	{
-		Entity entity = entity_freelist[ entity_freelist_count - 1 ];
-		entity_freelist_count--;
+		EntityID entity = Entity_Freelist[ Entity_Freelist_Count - 1 ];
+		Entity_Freelist_Count--;
     	return entity;
 	}
 	else // And only expand the range if free list is empty
 	{
-		assert( entity_next < MAX_ENTITIES );
-		Entity entity = entity_next;
-		entity_next++;
+		assert( Entity_Count < MAX_ENTITIES );
+		EntityID entity = Entity_Count;
+		Entity_Count++;
     	return entity;
 	}
-}
-	
+}	
 
 //*** Destroy ***
 
-void entity_destroy( Entity entity )
+void Entity_Destroy( EntityID entity )
 {
 	assert( entity < MAX_ENTITIES );
 
-	entity_freelist[ entity_freelist_count ] = entity;
-	entity_freelist_count++;
-
-	/*for( unsigned i = 0; i < destroy_function_count; i++ )
-	{
-		destroy_functions[ i ][ entity ];
-	}*/
+	Entity_Freelist[ Entity_Freelist_Count ] = entity;
+	Entity_Freelist_Count++;
+	Entity_Count--;
 }	
+
+//*** GetEntity ***
+
+Entity* Entity_Get( EntityID ID )
+{
+	assert( ID < Entity_Count  );
+
+	for( unsigned nEntity = 0 ; nEntity < Entity_Freelist_Count; nEntity++ )
+	{
+		if( Entity_Freelist[nEntity] == ID )
+			return 0;
+	}
+	
+	return &Entities[ID];
+}

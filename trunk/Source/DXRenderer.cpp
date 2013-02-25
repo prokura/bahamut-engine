@@ -1,5 +1,6 @@
 #include "Renderer.h"
 #include "Texture.h"
+#include "Shader.h"
 #include "WindowHandler.h"
 #include <assert.h>
 #include "config.h"
@@ -15,18 +16,10 @@ ID3D10RasterizerState*				dx_rasterizer_state		= NULL;
 static float						clear_color[4]			={ 0.93f,0.95f,0.98f,1 };
 
 static ID3D10Buffer*				dx_vertex_buffer		= NULL;
-static ID3D10InputLayout*			dx_vertex_layout		= NULL;
 static int							dx_vertex_count			= 0;
 
 //renderstate
 static ID3D10BlendState*			dx_AlphaBlendState		= NULL;
-
-//effects and techniques
-static ID3D10Effect*						dx_basic_effect			= NULL;
-static ID3D10EffectTechnique*				effect_technique		= NULL;
-static ID3D10EffectVariable*				effect_transform		= NULL;
-static ID3D10EffectVectorVariable*			effect_resolution		= NULL;
-static ID3D10EffectShaderResourceVariable*	effect_texture			= NULL;
 
 struct vertex
 {
@@ -38,35 +31,32 @@ struct vertex
 };
 
 bool Init_Device( int width );
-bool Init_Shader();
 bool Init_Vertex_Buffer();
 void Setup_Rasterization();
 void Cleanup_Device();
 
-//*** Texture Interface ***
-
-struct Transform
+struct Transform 
 {
 	float position[2];
-	float scale[2];
+	float scale [2];
 	float rotation;
 };
 
+//*** Texture Interface ***
+
 struct Texture
 {
-	// x,y,scale,rotation
-	Transform transform;
 	ID3D10ShaderResourceView* texture;
 };
 
-static unsigned Texture_next = 0;
+static unsigned Texture_Count = 0;
 static unsigned Texture_freelist[ MAX_TEXTURES ];
 static unsigned Texture_freelist_count = 0;
 static Texture Textures[ MAX_TEXTURES ];
 
 //*** Create Textures ***
 
-TextureId Create_Texture( const char* filename )
+TextureID Texture_Create( const char* filename )
 {
 	unsigned handle = 0;
 
@@ -78,10 +68,12 @@ TextureId Create_Texture( const char* filename )
 	}
 	else // And only expand the range if free list is empty
 	{
-		assert( Texture_next < MAX_TEXTURES );
-		handle = Texture_next;
-		Texture_next++;
+		assert( Texture_Count < MAX_TEXTURES );
+		handle = Texture_Count;
+		Texture_Count++;
 	}
+
+	//load the texture
 
 	Texture* Texture = &Textures[ handle ];
 	 
@@ -93,11 +85,12 @@ TextureId Create_Texture( const char* filename )
 	D3D10_TEXTURE2D_DESC desc2D;
     ((ID3D10Texture2D*)res)->GetDesc(&desc2D);
 
-	Texture->transform.position[0] = 0;
-	Texture->transform.position[1] = 0;
+	/*Texture->transform.position[0] = x / GAME_RESOLUTION_X;
+	Texture->transform.position[1] = y / GAME_RESOLUTION_Y;
+	Texture->transform.position[2] = 0;
 	Texture->transform.scale[0] = (float)(desc2D.Width/(float)GAME_RESOLUTION_X);
 	Texture->transform.scale[1] = (float)(desc2D.Height/(float)GAME_RESOLUTION_Y);
-	Texture->transform.rotation = 180;
+	Texture->transform.rotation = 180;*/
 
 	res->Release();
 
@@ -106,7 +99,7 @@ TextureId Create_Texture( const char* filename )
 
 //*** Destroy Textures ***
 
-void Destroy_Texture( TextureId Texture )
+void Texture_Destroy( TextureID Texture )
 {
 	assert( Texture < MAX_TEXTURES );
 
@@ -117,13 +110,112 @@ void Destroy_Texture( TextureId Texture )
 
 //*** Clear All Textures ***
 
-void Clear_All_Texture()
+void Texture_ClearAll()
 {
-	for( unsigned nTexture = 0 ; nTexture < Texture_next; nTexture++ )
+	for( unsigned nTexture = 0 ; nTexture < Texture_Count; nTexture++ )
 	{
-		Destroy_Texture( nTexture );
+		Texture_Destroy( nTexture );
 	}
+
+	Texture_freelist_count = 0;
+	Texture_Count = 0;
 }
+
+//*** Shader Interface ***
+
+struct Shader
+{
+	ID3D10Effect*						effect;	
+	ID3D10InputLayout*					effect_layout;	
+	ID3D10EffectTechnique*				effect_technique;
+	ID3D10EffectVariable*				effect_transform;
+	ID3D10EffectVectorVariable*			effect_resolution;
+	ID3D10EffectShaderResourceVariable*	effect_texture;	
+};
+
+static unsigned Shader_Count = 0;
+static unsigned Shader_Freelist[ MAX_TEXTURES ];
+static unsigned Shader_Freelist_Count = 0;
+static Shader Shaders[ MAX_SHADER ];
+
+//*** Create Shader ***
+
+TextureID Shader_Create( const char* filename )
+{
+	unsigned handle = 0;
+
+	// Create from the free list if we can
+	if( Shader_Freelist_Count > 0 )
+	{
+		handle = Shader_Freelist[ Shader_Freelist_Count - 1 ];
+		Shader_Freelist_Count--;
+	}
+	else // And only expand the range if free list is empty
+	{
+		assert( Shader_Count < MAX_TEXTURES );
+		handle = Shader_Count;
+		Shader_Count++;
+	}
+
+	if ( FAILED( D3DX10CreateEffectFromFile( filename,NULL,NULL,
+		"fx_4_0",D3D10_SHADER_ENABLE_STRICTNESS,0,dx_device,NULL, NULL,&Shaders[handle].effect,NULL, NULL  ) ) )
+		return false;
+
+	Shaders[handle].effect_technique = Shaders[handle].effect->GetTechniqueByName("Main");
+
+	//create shader parameters pointer
+	Shaders[handle].effect_resolution	= Shaders[handle].effect->GetVariableByName( "resolution" )->AsVector();
+	Shaders[handle].effect_transform	= Shaders[handle].effect->GetVariableByName( "t" );
+	Shaders[handle].effect_texture		= Shaders[handle].effect->GetVariableByName( "tex2D" )->AsShaderResource(); 
+
+	//tell directx how to handle vertex format we defined in the vertex struct
+	D3D10_INPUT_ELEMENT_DESC layout[] =
+	{
+		{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D10_INPUT_PER_VERTEX_DATA, 0 },
+		{ "COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 8, D3D10_INPUT_PER_VERTEX_DATA, 0 },
+		{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 24, D3D10_INPUT_PER_VERTEX_DATA, 0 }
+	};
+
+	UINT numElements = sizeof( layout ) / sizeof( layout[0] );
+
+	//create input layout
+	D3D10_PASS_DESC PassDesc;
+	Shaders[handle].effect_technique->GetPassByIndex( 0 )->GetDesc( &PassDesc );
+	assert( SUCCEEDED( dx_device->CreateInputLayout( layout, numElements, PassDesc.pIAInputSignature,PassDesc.IAInputSignatureSize, &Shaders[handle].effect_layout ) ) );
+
+	//set the resolution parameter in the shader
+	float resolution[2];
+	resolution[0] = GAME_RESOLUTION_X;
+	resolution[1] = GAME_RESOLUTION_Y;
+	Shaders[handle].effect_resolution->SetFloatVector( resolution );
+
+	dx_device->IASetInputLayout( Shaders[handle].effect_layout );
+
+	return handle;
+}
+
+//*** Destroy Shader ***
+
+void Shader_Destroy( ShaderID shader )
+{
+	assert( shader < MAX_TEXTURES );
+	Shaders[shader].effect->Release();
+	Shaders[shader].effect_layout->Release();
+}
+
+//*** Clear All Shaders ***
+
+void Shader_ClearAll()
+{
+	for( unsigned nShader = 0 ; nShader < Shader_Count; nShader++ )
+	{
+		Shader_Destroy( nShader );
+	}
+
+	Shader_Freelist_Count = 0;
+	Shader_Count = 0;
+}
+
 
 //*** Initialise ***
 
@@ -136,10 +228,6 @@ bool Renderer_Init( unsigned width, unsigned height, const char* title )
 	Initialisation = Init_Device( width );
         
     assert( Initialisation );
-
-	Initialisation = Init_Shader();
-	
-	assert( Initialisation );
 
 	Initialisation = Init_Vertex_Buffer();
 
@@ -154,7 +242,7 @@ bool Renderer_Init( unsigned width, unsigned height, const char* title )
 
 void Renderer_Terminate()
 {
-	Clear_All_Texture();
+	Texture_ClearAll();
 	Cleanup_Device();
 	Window_Destroy();
 }
@@ -166,21 +254,31 @@ void Renderer_Draw()
 	//clear scene
 	dx_device->ClearRenderTargetView( dx_render_target, clear_color );
 
-	effect_texture->SetResource( Textures[0].texture );
-	effect_transform->SetRawValue( &Textures[0].transform,0,36 );
+	Transform trans;
+	trans.position[0] = 0;
+	trans.position[1] = 0;
+	trans.scale[0] = 120.0f / GAME_RESOLUTION_X;
+	trans.scale[1] = 71.0f / GAME_RESOLUTION_Y;
+	trans.rotation = 0;
+
+	//get technique desc
+	D3D10_TECHNIQUE_DESC techDesc;
+	Shaders[0].effect_technique->GetDesc( &techDesc );
 
 	// Set primitive topology 
 	dx_device->IASetPrimitiveTopology( D3D10_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP );
 
-	//get technique desc
-	D3D10_TECHNIQUE_DESC techDesc;
-	effect_technique->GetDesc( &techDesc );
+	for( unsigned nTexture = 0 ; nTexture < Texture_Count; nTexture++ )
+	{
+		Shaders[0].effect_texture->SetResource( Textures[nTexture].texture );
+		Shaders[0].effect_transform->SetRawValue( &trans,0, sizeof(Transform) );
 	
-	//Apply technique
-	effect_technique->GetPassByIndex( 0 )->Apply( 0 );
+		//Apply technique
+		Shaders[0].effect_technique->GetPassByIndex( 0 )->Apply( 0 );
 
-	//Draw
-	dx_device->Draw( dx_vertex_count, 0 );
+		//Draw
+		dx_device->Draw( dx_vertex_count, 0 );
+	}
 
 	//flip buffers
 	dx_swap_chain->Present(0,0);
@@ -267,48 +365,6 @@ bool Init_Device( int /*width*/ )
 	return true;
 }
 
-//*** Init Shader ***
-
-bool Init_Shader()
-{
-	if ( FAILED( D3DX10CreateEffectFromFile( "Data\\Shader\\texture.fx",NULL,NULL,
-		"fx_4_0",D3D10_SHADER_ENABLE_STRICTNESS,0,dx_device,NULL, NULL,&dx_basic_effect,NULL, NULL  ) ) )
-		return false;
-
-	effect_technique	= dx_basic_effect->GetTechniqueByName("full");
-
-	//create matrix effect pointers
-	effect_resolution	= dx_basic_effect->GetVariableByName( "resolution" )->AsVector();
-	effect_transform	= dx_basic_effect->GetVariableByName( "t" );
-	effect_texture		= dx_basic_effect->GetVariableByName( "tex2D" )->AsShaderResource(); 
-
-	//tell directx how to handle vertex format we defined in the vertex struct
-	D3D10_INPUT_ELEMENT_DESC layout[] =
-	{
-		{ "POSITION", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 0, D3D10_INPUT_PER_VERTEX_DATA, 0 },
-		{ "COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 8, D3D10_INPUT_PER_VERTEX_DATA, 0 },
-		{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 24, D3D10_INPUT_PER_VERTEX_DATA, 0 }
-	};
-
-	UINT numElements = sizeof( layout ) / sizeof( layout[0] );
-
-	//create input layout
-	D3D10_PASS_DESC PassDesc;
-	effect_technique->GetPassByIndex( 0 )->GetDesc( &PassDesc );
-	HRESULT create_effect_layout = dx_device->CreateInputLayout( layout, numElements, PassDesc.pIAInputSignature,PassDesc.IAInputSignatureSize, &dx_vertex_layout );
-	
-	float resolution[2];
-	resolution[0] = GAME_RESOLUTION_X;
-	resolution[1] = GAME_RESOLUTION_Y;
-	effect_resolution->SetFloatVector( resolution );
-
-	assert( SUCCEEDED( create_effect_layout ) );
-
-	dx_device->IASetInputLayout( dx_vertex_layout );
-
-	return true;
-}
-
 //*** Init Vertex Buffer ***
 
 bool Init_Vertex_Buffer()
@@ -375,9 +431,7 @@ void Cleanup_Device()
 	if ( dx_swap_chain ) dx_swap_chain->Release();
 	if ( dx_device ) dx_device->Release();
 	if ( dx_vertex_buffer ) dx_vertex_buffer->Release();
-	if ( dx_vertex_layout ) dx_vertex_layout->Release();
 	if ( dx_rasterizer_state ) dx_rasterizer_state->Release();
-	if ( dx_basic_effect ) dx_basic_effect->Release();
 	if( dx_AlphaBlendState ) dx_AlphaBlendState->Release();
 }
 
