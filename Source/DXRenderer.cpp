@@ -189,8 +189,6 @@ TextureID Shader_Create( const char* filename )
 	resolution[1] = GAME_RESOLUTION_Y;
 	Shaders[handle].effect_resolution->SetFloatVector( resolution );
 
-	dx_device->IASetInputLayout( Shaders[handle].effect_layout );
-
 	return handle;
 }
 
@@ -243,6 +241,7 @@ bool Renderer_Init( unsigned width, unsigned height, const char* title )
 void Renderer_Terminate()
 {
 	Texture_ClearAll();
+	Shader_ClearAll();
 	Cleanup_Device();
 	Window_Destroy();
 }
@@ -261,11 +260,7 @@ void Renderer_Draw()
 	trans.scale[1] = 71.0f / GAME_RESOLUTION_Y;
 	trans.rotation = 0;
 
-	//get technique desc
-	D3D10_TECHNIQUE_DESC techDesc;
-	Shaders[0].effect_technique->GetDesc( &techDesc );
-
-	// Set primitive topology 
+	dx_device->IASetInputLayout( Shaders[0].effect_layout );
 	dx_device->IASetPrimitiveTopology( D3D10_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP );
 
 	for( unsigned nTexture = 0 ; nTexture < Texture_Count; nTexture++ )
