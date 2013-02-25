@@ -2,7 +2,7 @@
 #define Core_Config_h
 
 //ENTITY
-const unsigned MAX_ENTITIES = 1024;
+const unsigned MAX_ENTITIES = 256;
 
 //COMPONENTS
 const unsigned MAX_COMPONENTS_PER_ENTITY = 255;
@@ -16,7 +16,9 @@ const unsigned REFRESH_RATE = 60;
 const bool VSYNC_ENABLED = true;
 const bool FULL_SCREEN = false;
 const bool MULTI_SAMPLING = true;
-const int VERTEX_BUFFER_SIZE = 4096;
+const int VERTEX_BUFFER_SIZE = 4;
+
 const unsigned MAX_TEXTURES = 256;
+const unsigned MAX_SHADER = 10;
 
 #endif /* config_h */

@@ -20,13 +20,14 @@
     <ClCompile Include="Source\WindowHandler.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Source\Bitmap.h" />
     <ClInclude Include="source\config.h" />
     <ClInclude Include="Source\Entity.h" />
     <ClInclude Include="Source\float2.h" />
     <ClInclude Include="Source\float3.h" />
     <ClInclude Include="Source\float4.h" />
     <ClInclude Include="Source\Renderer.h" />
+    <ClInclude Include="Source\Shader.h" />
+    <ClInclude Include="Source\Texture.h" />
     <ClInclude Include="Source\WindowHandler.h" />
   </ItemGroup>
   <ItemGroup>

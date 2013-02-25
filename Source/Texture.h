@@ -3,10 +3,10 @@
 
 //REFERENCE INTERFACE FOR TEXTURE
 
-typedef unsigned TextureId;
+typedef unsigned TextureID;
 
-TextureId Create_Texture( const char* filename );
-void Destroy_Texture( TextureId Texture );
-void Clear_All_Texture();
+TextureID Texture_Create( const char* filename );
+void Texture_Destroy( TextureID Texture );
+void Texture_ClearAll();
 
 #endif /* Texture_h */
