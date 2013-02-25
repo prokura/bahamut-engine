@@ -24,10 +24,6 @@ void Game()
 	}
 		
 	Renderer_Terminate();
-
-	float* a = new float;
-
-	*a = 5.0f;
 }
 
 
