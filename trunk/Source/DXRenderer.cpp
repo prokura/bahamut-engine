@@ -30,7 +30,7 @@ struct vertex
       vertex( D3DXVECTOR2 p, D3DXVECTOR4 c, D3DXVECTOR2 uv ) : pos(p), color(c), texCoord(uv) {}
 };
 
-bool Init_Device( int width );
+bool Init_Device();
 bool Init_Vertex_Buffer();
 void Setup_Rasterization();
 void Cleanup_Device();
@@ -38,7 +38,8 @@ void Cleanup_Device();
 struct Transform 
 {
 	float position[2];
-	float scale [2];
+	float origin[2];
+	float scale[2];
 	float rotation;
 };
 
@@ -223,7 +224,7 @@ bool Renderer_Init( unsigned width, unsigned height, const char* title )
 
 	bool Initialisation = false;
 
-	Initialisation = Init_Device( width );
+	Initialisation = Init_Device();
         
     assert( Initialisation );
 
@@ -256,8 +257,10 @@ void Renderer_Draw()
 	Transform trans;
 	trans.position[0] = 0;
 	trans.position[1] = 0;
-	trans.scale[0] = 120.0f / GAME_RESOLUTION_X;
-	trans.scale[1] = 71.0f / GAME_RESOLUTION_Y;
+	trans.origin[0] = 0;
+	trans.origin[1] = 0;
+	trans.scale[0] = 120.0f;
+	trans.scale[1] = 71.0f;
 	trans.rotation = 0;
 
 	dx_device->IASetInputLayout( Shaders[0].effect_layout );
@@ -282,7 +285,7 @@ void Renderer_Draw()
 
 //*** Init Directx Device ***
 
-bool Init_Device( int /*width*/ )
+bool Init_Device()
 {
 	//Set up DX swap chain
 	DXGI_SWAP_CHAIN_DESC swapChainDesc;
@@ -388,10 +391,10 @@ bool Init_Vertex_Buffer()
 	//lock vertex buffer for CPU use
 	dx_vertex_buffer->Map( D3D10_MAP_WRITE_DISCARD, 0, (void**) &v );
 
-	v[0] = vertex( D3DXVECTOR2(-1,-1),D3DXVECTOR4(1,0,0,1),D3DXVECTOR2(0.0f, 1.0f) );
-	v[1] = vertex( D3DXVECTOR2(-1,1),D3DXVECTOR4(0,1,0,1),D3DXVECTOR2(0.0f, 0.0f) );
-	v[2] = vertex( D3DXVECTOR2(1,-1),D3DXVECTOR4(0,0,1,1),D3DXVECTOR2(1.0f, 1.0f) );
-	v[3] = vertex( D3DXVECTOR2(1,1),D3DXVECTOR4(1,1,0,1),D3DXVECTOR2(1.0f, 0.0f) );
+	v[0] = vertex( D3DXVECTOR2(0,0),D3DXVECTOR4(1,0,0,1),D3DXVECTOR2(0.0f, 0.0f) );
+	v[1] = vertex( D3DXVECTOR2(0,-1),D3DXVECTOR4(0,1,0,1),D3DXVECTOR2(0.0f, 1.0f) );
+	v[2] = vertex( D3DXVECTOR2(1,0),D3DXVECTOR4(0,0,1,1),D3DXVECTOR2(1.0f, 0.0f) );
+	v[3] = vertex( D3DXVECTOR2(1,-1),D3DXVECTOR4(1,1,0,1),D3DXVECTOR2(1.0f, 1.0f) );
 
 	dx_vertex_buffer->Unmap();
 

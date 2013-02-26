@@ -16,6 +16,7 @@ uniform float2 resolution;
 struct Transform
 {
 	float2 position;
+	float2 origin;
 	float2 scale;
 	float angle;
 };
@@ -43,9 +44,12 @@ PS_INPUT VS( VS_INPUT input )
 {
 	PS_INPUT ps_input;
 	
+	float halfwidth = resolution.x / 2;
+	float halfheight = resolution.y / 2;
+
 	float4 p;
-	p.x = (input.Pos.x * t.scale.x ) + t.position.x;
-	p.y = (input.Pos.y * t.scale.y ) + t.position.y;
+	p.x = ( (input.Pos.x * t.scale.x ) + (t.position.x - t.origin.x - halfwidth ) )/ halfwidth;
+	p.y = ( (input.Pos.y * t.scale.y ) - (t.position.y - t.origin.y - halfheight) )/ halfheight;
 	p.z = 0;
 	p.w = 1;
 
